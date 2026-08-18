@@ -62,7 +62,7 @@ export function TopBar({ title, onQuickAdd, onNavigate }: TopBarProps) {
               {user?.full_name ?? 'Guest'}
             </div>
             <div className="text-xs text-[var(--text-muted)] leading-tight">
-              {user ? roleLabel(user.role) : 'Local mode'}
+              {user ? roleLabel(user.role) : 'No account'}
             </div>
           </div>
         </button>

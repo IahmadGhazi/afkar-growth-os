@@ -4,7 +4,6 @@ import {
   Users,
   Bell,
   Database,
-  RotateCcw,
   Check,
   Pencil,
   X,
@@ -12,7 +11,7 @@ import {
 import { useApp } from '../../lib/store'
 import { currentClient, getConnection } from '../../lib/selectors'
 import { SOURCES } from '../../lib/integrations'
-import { PrimaryButton } from '../../components/shared/ui'
+import { backendAvailable } from '../../lib/backend'
 
 function Toggle({
   checked,
@@ -46,7 +45,6 @@ export function Settings() {
   const { state, actions } = useApp()
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(state.organization.name)
-  const [resetConfirm, setResetConfirm] = useState(false)
 
   const client = currentClient(state)
 
@@ -232,39 +230,26 @@ export function Settings() {
           </div>
         </div>
 
-        {/* Data */}
+        {/* Backend */}
         <div className="glass-card p-6">
           <div className="flex items-center gap-3 mb-4">
-            <RotateCcw size={20} className="text-[var(--critical)]" />
+            <Database size={20} className="text-[var(--positive)]" />
             <div>
-              <div className="font-medium text-[var(--text-primary)]">Local Data</div>
+              <div className="font-medium text-[var(--text-primary)]">Backend</div>
               <div className="text-sm text-[var(--text-muted)]">
-                All data lives in this browser. Reset removes it and restores the Afkar baseline data.
+                Data is stored in your Supabase project. No local browser storage is used.
               </div>
             </div>
           </div>
-          {resetConfirm ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-[var(--text-secondary)]">Reset all local data?</span>
-              <button
-                onClick={() => { actions.resetAll(); setResetConfirm(false) }}
-                className="btn btn-danger"
-              >
-                Yes, reset
-              </button>
-              <button
-                onClick={() => setResetConfirm(false)}
-                className="btn btn-outline"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <PrimaryButton onClick={() => setResetConfirm(true)}>
-              <RotateCcw size={16} />
-              Reset Local Data
-            </PrimaryButton>
-          )}
+          <div className="flex items-center gap-2 text-sm">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${backendAvailable ? 'bg-[var(--positive-soft)] text-[var(--positive)]' : 'bg-[rgba(22,26,34,0.06)] text-[var(--text-muted)]'}`}>
+              <Check size={12} />
+              {backendAvailable ? 'Connected' : 'Disconnected'}
+            </span>
+            <span className="text-xs text-[var(--text-muted)]">
+              {backendAvailable ? 'Reading and writing to Supabase' : 'Supabase environment not configured'}
+            </span>
+          </div>
         </div>
       </div>
     </div>

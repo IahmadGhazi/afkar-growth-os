@@ -105,7 +105,7 @@ export function Sidebar({ currentPath, onNavigate, onOpenNotifications }: Sideba
           <span className="font-medium">Notifications</span>
         </button>
         <div className="px-3.5 py-1.5">
-          <span className="chip text-[10px]">Local mode</span>
+          <span className="chip text-[10px]">Backend connected</span>
         </div>
       </div>
     </aside>

@@ -6,7 +6,10 @@ import type {
   Department,
   Client,
   Profile,
+  ClientAssignment,
   KpiDefinition,
+  KpiSnapshot,
+  KpiTarget,
   WeeklyObjective,
   KeyResult,
   Notification,
@@ -15,113 +18,103 @@ import type {
   DataSourceId,
 } from '../types/database'
 import type { AppState } from '../data/seed'
-import { buildSeed } from '../data/seed'
 import { todayISO } from './date'
-
-const STORAGE_KEY = 'afkar-growth-os:v1'
+import { backend } from './backend'
 
 type Listener = () => void
 
-interface Store<T> {
-  get: () => T
-  set: (updater: (prev: T) => T) => void
-  subscribe: (listener: Listener) => () => void
-  reset: () => void
+function emptyState(): AppState {
+  const now = new Date().toISOString()
+  return {
+    version: 6,
+    organization: {
+      id: '',
+      name: 'AFKAR Growth',
+      slug: 'afkar-growth',
+      settings: {},
+      created_at: now,
+      updated_at: now,
+    },
+    clients: [],
+    profiles: [],
+    clientAssignments: [],
+    tasks: [],
+    objectives: [],
+    keyResults: [],
+    kpiDefinitions: [],
+    kpiTargets: [],
+    kpiSnapshots: [],
+    connections: [],
+    syncLog: [],
+    notifications: [],
+    activity: [],
+    currentUserId: null,
+    currentClientId: null,
+  }
 }
 
-function createStore<T extends object>(seed: () => T, key: string): Store<T> {
-  let state: T = load() ?? seed()
+let state: AppState = emptyState()
+let bootstrapped = false
+const listeners = new Set<Listener>()
 
-  function load(): T | null {
-    try {
-      const raw = localStorage.getItem(key)
-      if (!raw) return null
-      const parsed = JSON.parse(raw) as Partial<T>
-      const seeded = seed()
-      const appSeed = seeded as unknown as AppState
-      const appParsed = parsed as unknown as Partial<AppState>
-      if (appParsed.version !== appSeed.version) {
-        const seedClientById = new Map(appSeed.clients.map((client) => [client.id, client]))
-        const clients = (appParsed.clients ?? appSeed.clients)
-          .filter((client) => client.id === 'cli_afkar')
-          .map((client) => ({
-            ...client,
-            settings: {
-              ...(seedClientById.get(client.id)?.settings ?? {}),
-              ...client.settings,
-            },
-          }))
-        return {
-          ...seeded,
-          ...parsed,
-          version: appSeed.version,
-          organization: {
-            ...appSeed.organization,
-            ...appParsed.organization,
-            settings: {
-              ...appSeed.organization.settings,
-              ...(appParsed.organization?.settings ?? {}),
-            },
-          },
-          clients,
-          currentClientId: clients[0]?.id ?? appSeed.currentClientId,
-          kpiDefinitions: appSeed.kpiDefinitions,
-          kpiTargets: appSeed.kpiTargets,
-          kpiSnapshots: appSeed.kpiSnapshots,
-          objectives: appSeed.objectives,
-          keyResults: appSeed.keyResults,
-          connections: mergeConnections(appSeed.connections, appParsed.connections ?? []),
-        } as T
-      }
-      return { ...seeded, ...parsed }
-    } catch {
-      return null
-    }
-  }
+function notify() {
+  listeners.forEach((listener) => listener())
+}
 
-  const listeners = new Set<Listener>()
-
-  return {
-    get: () => state,
-    set: (updater) => {
-      state = updater(state)
-      try {
-        localStorage.setItem(key, JSON.stringify(state))
-      } catch {
-        // storage unavailable (private mode) - keep in-memory only
-      }
-      listeners.forEach((listener) => listener())
-    },
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
-    reset: () => {
-      state = seed()
-      try {
-        localStorage.removeItem(key)
-      } catch {
-        // ignore
-      }
-      listeners.forEach((listener) => listener())
-    },
-  }
+function set(updater: (prev: AppState) => AppState) {
+  state = updater(state)
+  notify()
 }
 
 export function uid(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
 }
 
-function mergeConnections(seed: Connection[], stored: Connection[]): Connection[] {
-  const storedById = new Map(stored.map((connection) => [connection.id, connection]))
-  return seed.map((connection) => {
-    const existing = storedById.get(connection.id)
-    if (!existing) return connection
-    return { ...connection, ...existing, config: existing.config ?? connection.config }
-  })
+async function bootstrap() {
+  if (bootstrapped) return
+  bootstrapped = true
+  try {
+    if (!backend.available) {
+      set((s) => ({ ...s, organization: emptyState().organization }))
+      return
+    }
+    const data = await backend.loadAll()
+    set((s) => {
+      const next = {
+        ...s,
+        organization: data.organization ?? s.organization,
+        clients: data.clients,
+        profiles: data.profiles,
+        clientAssignments: data.clientAssignments,
+        tasks: data.tasks,
+        objectives: data.objectives,
+        keyResults: data.keyResults,
+        kpiDefinitions: data.kpiDefinitions,
+        kpiTargets: data.kpiTargets,
+        kpiSnapshots: data.kpiSnapshots,
+        connections: data.connections,
+        syncLog: data.syncLog,
+        notifications: data.notifications,
+        activity: data.activity,
+      }
+      // Derive the current user from the backend (no login yet): first active
+      // admin/super_admin profile, else the first active profile.
+      const admins = next.profiles.filter(
+        (p) => p.is_active && (p.role === 'super_admin' || p.role === 'account_manager'),
+      )
+      const fallback = next.profiles.find((p) => p.is_active)
+      const user = admins[0] ?? fallback ?? null
+      const client = next.clients[0] ?? null
+      return {
+        ...next,
+        currentUserId: user?.id ?? null,
+        currentClientId: client?.id ?? null,
+      }
+    })
+  } catch (err) {
+    console.error('bootstrap failed', err)
+  }
 }
-
-const store = createStore<AppState>(buildSeed, STORAGE_KEY)
 
 export type TaskInput = {
   title: string
@@ -162,15 +155,15 @@ export type ObjectiveInput = {
 
 export const actions = {
   switchClient(clientId: string) {
-    store.set((s) => ({ ...s, currentClientId: clientId }))
+    set((s) => ({ ...s, currentClientId: clientId }))
   },
 
   setCurrentUser(userId: string) {
-    store.set((s) => ({ ...s, currentUserId: userId }))
+    set((s) => ({ ...s, currentUserId: userId }))
   },
 
   addTask(input: TaskInput) {
-    store.set((s) => {
+    set((s) => {
       const clientId = s.currentClientId
       if (!clientId) return s
       const task: Task = {
@@ -196,12 +189,13 @@ export const actions = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
+      backend.insertTask(task).catch((err) => console.error(err))
       return { ...s, tasks: [...s.tasks, task] }
     })
   },
 
   updateTask(id: string, patch: Partial<Task>) {
-    store.set((s) => ({
+    set((s) => ({
       ...s,
       tasks: s.tasks.map((task) =>
         task.id === id
@@ -209,10 +203,13 @@ export const actions = {
           : task,
       ),
     }))
+    backend
+      .updateTask(id, { ...patch, updated_at: new Date().toISOString() })
+      .catch((err) => console.error(err))
   },
 
   moveTask(id: string, status: TaskStatus) {
-    store.set((s) => {
+    set((s) => {
       const now = new Date().toISOString()
       return {
         ...s,
@@ -228,14 +225,25 @@ export const actions = {
         }),
       }
     })
+    const task = state.tasks.find((t) => t.id === id)
+    const now = new Date().toISOString()
+    backend
+      .updateTask(id, {
+        status,
+        started_at: task?.started_at ?? (status === 'in_progress' ? now : task?.started_at ?? null),
+        completed_at: status === 'done' ? now : task?.completed_at ?? null,
+        updated_at: now,
+      })
+      .catch((err) => console.error(err))
   },
 
   deleteTask(id: string) {
-    store.set((s) => ({ ...s, tasks: s.tasks.filter((task) => task.id !== id) }))
+    set((s) => ({ ...s, tasks: s.tasks.filter((task) => task.id !== id) }))
+    backend.deleteTask(id).catch((err) => console.error(err))
   },
 
   addClient(input: ClientInput) {
-    store.set((s) => {
+    set((s) => {
       const client: Client = {
         id: uid('cli'),
         organization_id: s.organization.id,
@@ -247,12 +255,13 @@ export const actions = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
+      backend.insertClient(client).catch((err) => console.error(err))
       return { ...s, clients: [...s.clients, client] }
     })
   },
 
   addMember(input: MemberInput) {
-    store.set((s) => {
+    set((s) => {
       const profile: Profile = {
         id: uid('usr'),
         organization_id: s.organization.id,
@@ -264,12 +273,14 @@ export const actions = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
-      const assignment = {
+      const assignment: ClientAssignment = {
         id: uid('ca'),
         user_id: profile.id,
         client_id: s.currentClientId ?? s.clients[0]?.id ?? null,
         created_at: new Date().toISOString(),
       }
+      backend.insertProfile(profile).catch((err) => console.error(err))
+      if (assignment.client_id) backend.insertAssignment(assignment).catch((err) => console.error(err))
       return {
         ...s,
         profiles: [...s.profiles, profile],
@@ -281,14 +292,17 @@ export const actions = {
   },
 
   updateOrganization(patch: Partial<{ name: string; slug: string; settings: Record<string, unknown> }>) {
-    store.set((s) => ({
+    set((s) => ({
       ...s,
       organization: { ...s.organization, ...patch, updated_at: new Date().toISOString() },
     }))
+    backend
+      .updateOrganization(state.organization.id, { ...patch, updated_at: new Date().toISOString() })
+      .catch((err) => console.error(err))
   },
 
   addKpi(input: KpiInput) {
-    store.set((s) => {
+    set((s) => {
       const clientId = s.currentClientId
       if (!clientId) return s
       const definition: KpiDefinition = {
@@ -303,7 +317,7 @@ export const actions = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
-      const snapshot = {
+      const snapshot: KpiSnapshot = {
         id: uid('snap'),
         kpi_id: definition.id,
         client_id: clientId,
@@ -313,7 +327,7 @@ export const actions = {
         notes: null,
         created_at: new Date().toISOString(),
       }
-      const target = {
+      const target: KpiTarget = {
         id: uid('target'),
         kpi_id: definition.id,
         client_id: clientId,
@@ -322,6 +336,9 @@ export const actions = {
         target_value: input.target,
         created_at: new Date().toISOString(),
       }
+      backend.insertKpiDefinition(definition).catch((err) => console.error(err))
+      backend.insertSnapshot(snapshot).catch((err) => console.error(err))
+      backend.insertTarget(target).catch((err) => console.error(err))
       return {
         ...s,
         kpiDefinitions: [...s.kpiDefinitions, definition],
@@ -332,14 +349,14 @@ export const actions = {
   },
 
   setKpiValue(kpiId: string, value: number) {
-    store.set((s) => {
+    set((s) => {
       const clientId = s.currentClientId
       if (!clientId) return s
       const date = todayISO()
       const rest = s.kpiSnapshots.filter(
         (snap) => !(snap.kpi_id === kpiId && snap.client_id === clientId && snap.snapshot_date === date),
       )
-      const snapshot = {
+      const snapshot: KpiSnapshot = {
         id: uid('snap'),
         kpi_id: kpiId,
         client_id: clientId,
@@ -349,42 +366,44 @@ export const actions = {
         notes: null,
         created_at: new Date().toISOString(),
       }
+      backend.insertSnapshot(snapshot).catch((err) => console.error(err))
       return { ...s, kpiSnapshots: [...rest, snapshot] }
     })
   },
 
   setKpiValues(values: Record<string, number>, source: string = 'manual') {
-    store.set((s) => {
+    set((s) => {
       const clientId = s.currentClientId
       if (!clientId) return s
       const date = todayISO()
       let snapshots = s.kpiSnapshots
+      const created: KpiSnapshot[] = []
       for (const [kpiId, value] of Object.entries(values)) {
         const definition = s.kpiDefinitions.find((d) => d.id === kpiId)
         if (!definition || definition.client_id !== clientId) continue
         snapshots = snapshots.filter(
           (snap) => !(snap.kpi_id === kpiId && snap.client_id === clientId && snap.snapshot_date === date),
         )
-        snapshots = [
-          ...snapshots,
-          {
-            id: uid('snap'),
-            kpi_id: kpiId,
-            client_id: clientId,
-            snapshot_date: date,
-            value,
-            source,
-            notes: null,
-            created_at: new Date().toISOString(),
-          },
-        ]
+        const snapshot: KpiSnapshot = {
+          id: uid('snap'),
+          kpi_id: kpiId,
+          client_id: clientId,
+          snapshot_date: date,
+          value,
+          source,
+          notes: null,
+          created_at: new Date().toISOString(),
+        }
+        snapshots = [...snapshots, snapshot]
+        created.push(snapshot)
       }
+      created.forEach((snapshot) => backend.insertSnapshot(snapshot).catch((err) => console.error(err)))
       return { ...s, kpiSnapshots: snapshots }
     })
   },
 
   connectSource(source: DataSourceId, clientId: string | null, config?: Record<string, unknown>) {
-    store.set((s) => {
+    set((s) => {
       const now = new Date().toISOString()
       const existing = s.connections.find((connection) => connection.id === source)
       const connection: Connection = existing
@@ -406,6 +425,7 @@ export const actions = {
             created_at: now,
             updated_at: now,
           }
+      backend.upsertConnection(connection).catch((err) => console.error(err))
       return {
         ...s,
         connections: [...s.connections.filter((c) => c.id !== source), connection],
@@ -414,18 +434,25 @@ export const actions = {
   },
 
   disconnectSource(source: DataSourceId) {
-    store.set((s) => ({
-      ...s,
-      connections: s.connections.map((connection) =>
-        connection.id === source
-          ? { ...connection, connected: false, updated_at: new Date().toISOString() }
-          : connection,
-      ),
-    }))
+    set((s) => {
+      const connection = s.connections.find((c) => c.id === source)
+      const updated = connection
+        ? { ...connection, connected: false, updated_at: new Date().toISOString() }
+        : null
+      if (updated) backend.upsertConnection(updated).catch((err) => console.error(err))
+      return {
+        ...s,
+        connections: s.connections.map((connection) =>
+          connection.id === source
+            ? { ...connection, connected: false, updated_at: new Date().toISOString() }
+            : connection,
+        ),
+      }
+    })
   },
 
   syncSource(source: DataSourceId) {
-    store.set((s) => {
+    set((s) => {
       const now = new Date().toISOString()
       const rowCount = s.kpiDefinitions.filter(
         (definition) => definition.source === source && definition.client_id === s.currentClientId,
@@ -438,6 +465,12 @@ export const actions = {
         error: null,
         synced_at: now,
       }
+      const connection = s.connections.find((c) => c.id === source)
+      const updated = connection
+        ? { ...connection, connected: true, last_sync_at: now, sync_error: null, updated_at: now }
+        : null
+      backend.insertSyncRun(run).catch((err) => console.error(err))
+      if (updated) backend.upsertConnection(updated).catch((err) => console.error(err))
       return {
         ...s,
         syncLog: [run, ...s.syncLog].slice(0, 30),
@@ -451,7 +484,7 @@ export const actions = {
   },
 
   logSyncRun(source: string, status: SyncRun['status'], rowCount: number, error: string | null) {
-    store.set((s) => {
+    set((s) => {
       const run: SyncRun = {
         id: uid('sync'),
         source,
@@ -460,6 +493,7 @@ export const actions = {
         error,
         synced_at: new Date().toISOString(),
       }
+      backend.insertSyncRun(run).catch((err) => console.error(err))
       return { ...s, syncLog: [run, ...s.syncLog].slice(0, 30) }
     })
   },
@@ -470,10 +504,10 @@ export const actions = {
     clientId: string | null,
     config?: Record<string, unknown>,
   ): number {
-    const state = store.get()
+    const current = state
     if (!clientId) return 0
     const byName = new Map(
-      state.kpiDefinitions
+      current.kpiDefinitions
         .filter((d) => d.client_id === clientId && d.is_active)
         .map((d) => [d.name.toLowerCase(), d.id]),
     )
@@ -490,7 +524,7 @@ export const actions = {
       return 0
     }
     actions.setKpiValues(values, source)
-    store.set((s) => {
+    set((s) => {
       const now = new Date().toISOString()
       const run: SyncRun = {
         id: uid('sync'),
@@ -500,6 +534,19 @@ export const actions = {
         error: null,
         synced_at: now,
       }
+      const connection = s.connections.find((c) => c.id === source)
+      const updated = connection
+        ? {
+            ...connection,
+            connected: true,
+            last_sync_at: now,
+            sync_error: null,
+            config: { ...(connection.config ?? {}), ...(config ?? {}) },
+            updated_at: now,
+          }
+        : null
+      backend.insertSyncRun(run).catch((err) => console.error(err))
+      if (updated) backend.upsertConnection(updated).catch((err) => console.error(err))
       return {
         ...s,
         syncLog: [run, ...s.syncLog].slice(0, 30),
@@ -521,7 +568,7 @@ export const actions = {
   },
 
   updateConnection(source: DataSourceId, patch: Partial<Connection>) {
-    store.set((s) => ({
+    set((s) => ({
       ...s,
       connections: s.connections.map((connection) =>
         connection.id === source
@@ -529,28 +576,33 @@ export const actions = {
           : connection,
       ),
     }))
+    backend
+      .upsertConnection({ ...state.connections.find((c) => c.id === source)!, ...patch, id: source, updated_at: new Date().toISOString() } as Connection)
+      .catch((err) => console.error(err))
   },
 
   updateClient(id: string, patch: Partial<Client>) {
-    store.set((s) => ({
+    set((s) => ({
       ...s,
       clients: s.clients.map((client) =>
         client.id === id ? { ...client, ...patch, updated_at: new Date().toISOString() } : client,
       ),
     }))
+    backend.updateClient(id, { ...patch, updated_at: new Date().toISOString() }).catch((err) => console.error(err))
   },
 
   updateMember(id: string, patch: Partial<Profile>) {
-    store.set((s) => ({
+    set((s) => ({
       ...s,
       profiles: s.profiles.map((profile) =>
         profile.id === id ? { ...profile, ...patch, updated_at: new Date().toISOString() } : profile,
       ),
     }))
+    backend.updateProfile(id, { ...patch, updated_at: new Date().toISOString() }).catch((err) => console.error(err))
   },
 
   addObjective(input: ObjectiveInput) {
-    store.set((s) => {
+    set((s) => {
       const clientId = s.currentClientId
       if (!clientId) return s
       const objective: WeeklyObjective = {
@@ -566,44 +618,61 @@ export const actions = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
+      backend.insertObjective(objective).catch((err) => console.error(err))
       return { ...s, objectives: [...s.objectives, objective] }
     })
   },
 
   updateKeyResult(id: string, patch: Partial<KeyResult>) {
-    store.set((s) => ({
+    set((s) => ({
       ...s,
       keyResults: s.keyResults.map((kr) =>
         kr.id === id ? { ...kr, ...patch, updated_at: new Date().toISOString() } : kr,
       ),
     }))
+    backend.updateKeyResult(id, { ...patch, updated_at: new Date().toISOString() }).catch((err) => console.error(err))
   },
 
   markNotificationsRead() {
-    store.set((s) => ({
+    set((s) => ({
       ...s,
       notifications: s.notifications.map((n: Notification) => ({ ...n, is_read: true })),
     }))
+    backend.updateNotifications({ is_read: true }).catch((err) => console.error(err))
   },
 
   markNotificationRead(id: string) {
-    store.set((s) => ({
+    set((s) => ({
       ...s,
       notifications: s.notifications.map((n: Notification) =>
         n.id === id ? { ...n, is_read: true } : n,
       ),
     }))
+    backend.updateNotification(id, { is_read: true }).catch((err) => console.error(err))
   },
 
   resetAll() {
-    store.reset()
+    set(() => emptyState())
   },
 }
 
 export function useAppState() {
-  return useSyncExternalStore(store.subscribe, store.get)
+  return useSyncExternalStore(subscribe, getState)
 }
 
 export function useApp() {
   return { state: useAppState(), actions }
+}
+
+function subscribe(cb: Listener) {
+  listeners.add(cb)
+  return () => listeners.delete(cb)
+}
+
+function getState() {
+  return state
+}
+
+export function initStore() {
+  bootstrap()
 }

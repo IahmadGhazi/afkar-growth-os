@@ -8,8 +8,10 @@ command center — all in one place, all fully working, all E2E-verified.
 ## Stack
 
 - Vite 8 + React 19 + TypeScript + Tailwind CSS 4
-- Local-first state in `localStorage` (key `afkar-growth-os:v1`) with versioned,
-  merge-safe migrations — the app works with **zero backend**.
+- Data lives in **Supabase** (Postgres). The store bootstraps from the backend on
+  load and every mutation writes through to it. No browser localStorage is used.
+- The current user is derived from the backend `profiles` table (no login UI
+  yet — the first active admin is used).
 - Data entry today: manual/CSV, **Excel (.xlsx) import + export**, and **Google
   Sheets** sync (link only, no API key required).
 - Real API integrations (Salla, Google Ads, TikTok Ads, Snapchat Ads) are wired as
@@ -25,17 +27,26 @@ npm run lint
 npm run build
 ```
 
-### Local-first seed
+## Database (Supabase)
 
-The store auto-seeds real business data for Afkar Modern on first run. Bump the
-seed version in `src/data/seed.ts` when the KPI definitions change; the
-migration merges definitions and preserves user connections/config.
+Run `supabase/schema.sql` in the Supabase SQL Editor. It is idempotent and
+creates every table (organizations, clients, profiles, client_assignments,
+tasks, weekly_objectives, key_results, kpi_definitions, kpi_snapshots,
+kpi_targets, notifications, activity_logs, connections, sync_runs) plus RLS
+policies and baseline seed data (1 org, 1 client, 2 admin users, testing users,
+tasks, objectives, KPIs, snapshots, connections).
+
+RLS currently grants anon + authenticated full access because there is no
+login yet — tighten the policies when authentication is added.
+
+Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local` (local dev)
+and as Cloudflare Pages env vars (production).
 
 ## Testing
 
 `smoke_test.py` (Playwright) drives the built app and asserts every feature
-works. It uses an isolated browser context, so test mutations never touch your
-real data.
+loads from the backend and renders. `verify_backend.py` checks the full data
+surface (KPIs, tasks, team, report) and write-through.
 
 ```bash
 # build first, then with the dev/preview server running on :5173
@@ -68,19 +79,15 @@ are per-repo, and this repo is separate from `ghazi-portal`).
 
 ### 3. Supabase (new project under the new account)
 
-The app runs without Supabase today — the client is gated behind
-`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`. Supabase becomes the home of the
-server-side sync backend (token proxy + history) when real API sync is turned
-on:
-
 1. Create the new Supabase account → new project.
-2. Copy the project URL + anon key into Cloudflare Pages env vars
+2. Run `supabase/schema.sql` in the SQL Editor.
+3. Copy the project URL + anon key into Cloudflare Pages env vars
    (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) and rebuild.
-3. Free-tier note: projects **pause after 7 days of inactivity** — the Ghazi
-   Portal solved this with a keep-alive cron Worker; do the same here if you
-   need the backend always warm.
+4. Free-tier note: projects **pause after 7 days of inactivity** — a keep-alive
+   cron Worker (`afkar-supabase-keeper`) pings the project every 15 minutes so
+   it never pauses.
 
-### Live API sync (Salla / Meta / TikTok / Snap)
+### Live API sync (Salla / Google Ads / TikTok / Snapchat)
 
 Client-side direct calls would leak tokens and hit CORS. Production sync runs
 through a server-side proxy (Cloudflare Pages Function or Supabase Edge
