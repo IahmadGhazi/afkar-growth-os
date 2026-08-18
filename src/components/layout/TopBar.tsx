@@ -87,11 +87,11 @@ export function TopBar({ title, onQuickAdd, onNavigate }: TopBarProps) {
           onClick={() => onNavigate?.('/settings')}
           className="flex items-center gap-2.5 pl-1.5 pr-2 py-1.5 rounded-xl hover:bg-[var(--hover)] transition-colors"
         >
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#6177ff] to-[#4459e8] flex items-center justify-center shadow-[0_4px_12px_rgba(77,99,242,0.3)]">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#f0c42e] to-[#d29a0c] flex items-center justify-center shadow-[0_4px_12px_rgba(210,154,12,0.3)]">
             {user?.full_name ? (
-              <span className="text-sm font-bold text-white">{user.full_name.charAt(0)}</span>
+              <span className="text-sm font-bold text-[#1a1405]">{user.full_name.charAt(0)}</span>
             ) : (
-              <span className="text-sm font-bold text-white">?</span>
+              <span className="text-sm font-bold text-[#1a1405]">?</span>
             )}
           </div>
           <div className="text-left hidden md:block">

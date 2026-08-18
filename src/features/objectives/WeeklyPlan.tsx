@@ -150,7 +150,7 @@ export function WeeklyPlan() {
                 )}
               </div>
               <div className="text-right">
-                <div className="text-3xl font-extrabold bg-gradient-to-br from-[#6177ff] to-[#4459e8] bg-clip-text text-transparent">
+                <div className="text-3xl font-extrabold bg-gradient-to-br from-[#f0c42e] to-[#d29a0c] bg-clip-text text-transparent">
                   {objective.progress_pct}%
                 </div>
                 <div className="text-sm text-[var(--text-muted)]">complete</div>
@@ -159,7 +159,7 @@ export function WeeklyPlan() {
 
             <div className="h-2.5 bg-[var(--track)] rounded-full overflow-hidden mb-6">
               <div
-                className="h-full bg-gradient-to-r from-[#6177ff] to-[#4459e8] rounded-full transition-all"
+                className="h-full bg-gradient-to-r from-[#f0c42e] to-[#d29a0c] rounded-full transition-all"
                 style={{ width: `${objective.progress_pct}%` }}
               />
             </div>
@@ -197,7 +197,7 @@ export function WeeklyPlan() {
                     dept.progress === 100
                       ? 'bg-gradient-to-r from-[#19b87a] to-[#0f9c68]'
                       : dept.progress >= 70
-                      ? 'bg-gradient-to-r from-[#6177ff] to-[#4459e8]'
+                      ? 'bg-gradient-to-r from-[#f0c42e] to-[#d29a0c]'
                       : 'bg-gradient-to-r from-[#f2b04a] to-[#e0902e]'
                   }`}
                   style={{ width: `${dept.progress}%` }}

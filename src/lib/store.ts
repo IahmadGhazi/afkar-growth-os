@@ -16,6 +16,7 @@ import type {
   Connection,
   SyncRun,
   DataSourceId,
+  ChatMessage,
 } from '../types/database'
 import type { AppState } from '../data/seed'
 import { todayISO } from './date'
@@ -48,6 +49,7 @@ function emptyState(): AppState {
     syncLog: [],
     notifications: [],
     activity: [],
+    messages: [],
     currentUserId: null,
     currentClientId: null,
   }
@@ -96,6 +98,7 @@ async function bootstrap() {
         syncLog: data.syncLog,
         notifications: data.notifications,
         activity: data.activity,
+        messages: data.messages,
       }
       // Derive the current user from the backend (no login yet): first active
       // admin/super_admin profile, else the first active profile.
@@ -661,6 +664,23 @@ export const actions = {
       ),
     }))
     backend.updateNotification(id, { is_read: true }).catch((err) => console.error(err))
+  },
+
+  sendMessage(body: string) {
+    set((s) => {
+      const clientId = s.currentClientId
+      const authorId = s.currentUserId
+      if (!clientId || !authorId || !body.trim()) return s
+      const message: ChatMessage = {
+        id: uid('msg'),
+        client_id: clientId,
+        author_id: authorId,
+        body: body.trim(),
+        created_at: new Date().toISOString(),
+      }
+      backend.insertMessage(message).catch((err) => console.error(err))
+      return { ...s, messages: [...s.messages, message] }
+    })
   },
 
   resetAll() {

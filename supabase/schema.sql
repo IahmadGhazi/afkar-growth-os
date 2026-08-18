@@ -186,6 +186,15 @@ create table if not exists public.activity_logs (
   created_at timestamptz not null default now()
 );
 
+-- ---------- CHAT MESSAGES ----------
+create table if not exists public.messages (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  author_id text not null references public.profiles(id) on delete cascade,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- CONNECTIONS ----------
 create table if not exists public.connections (
   id text primary key,
@@ -209,6 +218,9 @@ create table if not exists public.sync_runs (
   created_at timestamptz not null default now()
 );
 
+-- Additive migration for DBs created before this column existed.
+alter table public.sync_runs add column if not exists created_at timestamptz not null default now();
+
 -- ============================================================
 -- RLS
 -- No login yet: grant anon + authenticated full access so the app
@@ -227,6 +239,7 @@ alter table public.kpi_snapshots enable row level security;
 alter table public.kpi_targets enable row level security;
 alter table public.notifications enable row level security;
 alter table public.activity_logs enable row level security;
+alter table public.messages enable row level security;
 alter table public.connections enable row level security;
 alter table public.sync_runs enable row level security;
 
@@ -243,6 +256,7 @@ do $$ begin
   create policy "anon full access kpi_targets" on public.kpi_targets for all to anon using (true) with check (true);
   create policy "anon full access notifications" on public.notifications for all to anon using (true) with check (true);
   create policy "anon full access activity_logs" on public.activity_logs for all to anon using (true) with check (true);
+  create policy "anon full access messages" on public.messages for all to anon using (true) with check (true);
   create policy "anon full access connections" on public.connections for all to anon using (true) with check (true);
   create policy "anon full access sync_runs" on public.sync_runs for all to anon using (true) with check (true);
 exception when duplicate_object then null; end $$;
@@ -468,4 +482,12 @@ on conflict (id) do nothing;
 -- Sync log
 insert into public.sync_runs (id, source, status, row_count, error, synced_at, created_at) values
   ('sync_1', 'manual', 'success', 8, null, now(), now())
+on conflict (id) do nothing;
+
+-- Chat messages (a few to start the conversation)
+insert into public.messages (id, client_id, author_id, body, created_at) values
+  ('msg_1', 'cli_afkar', 'usr_omar', 'Welcome everyone 👋 Let\u2019s keep all updates and handoffs here so nothing gets lost in WhatsApp.', now() - interval '2 days'),
+  ('msg_2', 'cli_afkar', 'usr_ahmad', 'Perfect \u2014 I\u2019ll post the National Day banner files here once approved.', now() - interval '2 days' + interval '1 hour'),
+  ('msg_3', 'cli_afkar', 'usr_sara', 'SEO landing page is live: /national-day-offers. Internal links added to menu + footer.', now() - interval '1 day'),
+  ('msg_4', 'cli_afkar', 'usr_ali', 'Cart abandonment retargeting campaign is running. ROAS holding above 12 so far.', now() - interval '3 hours')
 on conflict (id) do nothing;

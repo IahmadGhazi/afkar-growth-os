@@ -12,7 +12,7 @@ export interface TrendDatum {
 
 export function Sparkline({
   data,
-  color = '#6177ff',
+  color = '#d29a0c',
   width = 132,
   height = 38,
 }: {
@@ -68,7 +68,7 @@ export function Sparkline({
 export function TrendChart({
   data,
   mode = 'area',
-  color = '#6177ff',
+  color = '#d29a0c',
   target,
   targetLabel,
   formatValue,

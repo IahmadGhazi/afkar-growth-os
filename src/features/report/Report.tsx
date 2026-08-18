@@ -135,7 +135,7 @@ export function Report() {
         {/* Masthead */}
         <div className="flex items-start justify-between border-b border-[rgba(22,26,34,0.12)] pb-6">
           <div>
-            <div className="text-[11px] font-extrabold tracking-[0.18em] text-[#4d63f2]">
+            <div className="text-[11px] font-extrabold tracking-[0.18em] text-[#c8920b]">
               AFKAR GROWTH OS
             </div>
             <h1 className="text-2xl font-extrabold mt-1">Client Performance Report</h1>
@@ -153,7 +153,7 @@ export function Report() {
 
         {/* AI Briefing */}
         <div className="py-6">
-          <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#4d63f2] mb-2">
+          <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#c8920b] mb-2">
             Management Summary
           </div>
           <p className="text-sm leading-relaxed text-[#33373f]">{briefing.summary}</p>
@@ -209,7 +209,7 @@ export function Report() {
                 ))}
               </tbody>
               <tfoot>
-                <tr className="bg-[rgba(77,99,242,0.08)] text-[#171a21]">
+                <tr className="bg-[rgba(210,154,12,0.08)] text-[#171a21]">
                   <td className="px-4 py-3 font-extrabold">Total across all platforms</td>
                   <td className="px-4 py-3 text-right font-bold">{Math.round(platform.totalSpend).toLocaleString()} SAR</td>
                   <td className="px-4 py-3 text-right font-bold">{Math.round(platform.totalSales).toLocaleString()} SAR</td>
@@ -255,7 +255,7 @@ export function Report() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: 'Done', value: doneThisWeek, tone: '#0fa96c' },
-              { label: 'Awaiting review', value: reviewTasks.length, tone: '#4d63f2' },
+              { label: 'Awaiting review', value: reviewTasks.length, tone: '#c8920b' },
               { label: 'Blocked', value: blockedTasks.length, tone: '#dd5a5a' },
               { label: 'Overdue', value: overdueTasks.length, tone: '#e0902e' },
             ].map((item) => (
@@ -299,7 +299,7 @@ export function Report() {
                 <div className="h-1.5 bg-[rgba(22,26,34,0.08)] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full"
-                    style={{ width: `${dept.percentage}%`, backgroundColor: dept.percentage >= 70 ? '#4d63f2' : '#e0902e' }}
+                    style={{ width: `${dept.percentage}%`, backgroundColor: dept.percentage >= 70 ? '#c8920b' : '#e0902e' }}
                   />
                 </div>
               </div>
@@ -316,10 +316,10 @@ export function Report() {
             <div className="rounded-xl border border-[rgba(22,26,34,0.1)] p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-bold">{objective.title}</span>
-                <span className="text-sm font-semibold text-[#4d63f2]">{objective.progress_pct}%</span>
+                <span className="text-sm font-semibold text-[#c8920b]">{objective.progress_pct}%</span>
               </div>
               <div className="h-1.5 bg-[rgba(22,26,34,0.08)] rounded-full overflow-hidden mb-4">
-                <div className="h-full rounded-full bg-[#4d63f2]" style={{ width: `${objective.progress_pct}%` }} />
+                <div className="h-full rounded-full bg-[#c8920b]" style={{ width: `${objective.progress_pct}%` }} />
               </div>
               {keyResults.length > 0 && (
                 <ul className="space-y-1.5">
@@ -330,7 +330,7 @@ export function Report() {
                         style={{
                           backgroundColor:
                             kr.status === 'achieved' ? '#0fa96c'
-                            : kr.status === 'on_track' ? '#4d63f2'
+                            : kr.status === 'on_track' ? '#c8920b'
                             : kr.status === 'at_risk' ? '#e0902e'
                             : '#dd5a5a',
                         }}

@@ -211,7 +211,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
                 <div className="w-[120px] shrink-0">
                   <Sparkline
                     data={stat.series.map((d) => d.value)}
-                    color={stat.good ? '#19b87a' : stat.change ? '#dd5a5a' : '#6177ff'}
+                    color={stat.good ? '#19b87a' : stat.change ? '#dd5a5a' : '#d29a0c'}
                   />
                 </div>
               </div>
@@ -300,7 +300,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
 
       {/* AI Briefing */}
       <section>
-        <div className="glass-card p-6 bg-gradient-to-br from-[rgba(77,99,242,0.07)] to-[rgba(77,99,242,0.02)] border-[rgba(77,99,242,0.22)]">
+        <div className="glass-card p-6 bg-gradient-to-br from-[rgba(210,154,12,0.09)] to-[rgba(210,154,12,0.02)] border-[rgba(210,154,12,0.25)]">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-9 h-9 rounded-xl bg-[var(--brand-soft)] flex items-center justify-center">
               <Sparkles size={18} className="text-[var(--brand)]" />
@@ -493,7 +493,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
               <TrendChart
                 data={pacing.series}
                 mode="bar"
-                color="#6177ff"
+                color="#d29a0c"
                 formatValue={compact}
                 target={pacing.weeklyBudget}
                 targetLabel="budget"
@@ -537,7 +537,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
               </div>
               <div className="h-2 bg-[var(--track)] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-[#6177ff] to-[#4459e8] rounded-full"
+                  className="h-full bg-gradient-to-r from-[#f0c42e] to-[#d29a0c] rounded-full"
                   style={{ width: `${objective.progress_pct}%` }}
                 />
               </div>
@@ -572,7 +572,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
                       dept.percentage === 100
                         ? 'bg-gradient-to-r from-[#19b87a] to-[#0f9c68]'
                         : dept.percentage >= 70
-                        ? 'bg-gradient-to-r from-[#6177ff] to-[#4459e8]'
+                        ? 'bg-gradient-to-r from-[#f0c42e] to-[#d29a0c]'
                         : 'bg-gradient-to-r from-[#f2b04a] to-[#e0902e]'
                     }`}
                     style={{ width: `${dept.percentage}%` }}

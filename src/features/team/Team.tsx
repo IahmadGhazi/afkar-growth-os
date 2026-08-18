@@ -36,8 +36,8 @@ function MemberCard({ member }: { member: Profile }) {
   return (
     <div className={`glass-card hover-lift p-5 ${isViewing ? 'ring-2 ring-[var(--brand)]' : ''}`}>
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#6177ff] to-[#4459e8] flex items-center justify-center shadow-[0_4px_12px_rgba(77,99,242,0.3)]">
-          <span className="text-sm font-bold text-white">
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#f0c42e] to-[#d29a0c] flex items-center justify-center shadow-[0_4px_12px_rgba(210,154,12,0.3)]">
+          <span className="text-sm font-bold text-[#1a1405]">
             {member.full_name?.charAt(0) ?? '?'}
           </span>
         </div>
@@ -123,8 +123,8 @@ export function Team() {
       {!isAdminView && (
         <div className="glass-card p-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-l-[var(--brand)]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#6177ff] to-[#4459e8] flex items-center justify-center">
-              <span className="text-sm font-bold text-white">{viewing?.full_name?.charAt(0) ?? '?'}</span>
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#f0c42e] to-[#d29a0c] flex items-center justify-center">
+              <span className="text-sm font-bold text-[#1a1405]">{viewing?.full_name?.charAt(0) ?? '?'}</span>
             </div>
             <div>
               <div className="text-sm font-semibold text-[var(--text-primary)]">

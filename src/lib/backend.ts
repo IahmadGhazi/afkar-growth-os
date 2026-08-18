@@ -1,6 +1,7 @@
 import { supabase, hasSupabaseEnv } from './supabase'
 import type {
   ActivityLog,
+  ChatMessage,
   Client,
   ClientAssignment,
   Connection,
@@ -60,7 +61,7 @@ export const backend = {
   available: backendAvailable,
 
   async loadAll() {
-    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity] =
+    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages] =
       await Promise.all([
         selectAllSafe<Organization>('organizations'),
         selectAllSafe<Client>('clients'),
@@ -76,6 +77,7 @@ export const backend = {
         selectAllSafe<SyncRun>('sync_runs', 'synced_at'),
         selectAllSafe<Notification>('notifications'),
         selectAllSafe<ActivityLog>('activity_logs'),
+        selectAllSafe<ChatMessage>('messages', 'created_at'),
       ])
     return {
       organization: organization[0] ?? null,
@@ -92,6 +94,7 @@ export const backend = {
       syncLog,
       notifications,
       activity,
+      messages,
     }
   },
 
@@ -139,4 +142,6 @@ export const backend = {
   },
 
   insertActivity: (row: ActivityLog) => upsert('activity_logs', row),
+
+  insertMessage: (row: ChatMessage) => upsert('messages', row),
 }

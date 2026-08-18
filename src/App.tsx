@@ -11,6 +11,7 @@ import { Kpis } from './features/kpis/Kpis'
 import { Data } from './features/data/Data'
 import { Settings } from './features/settings/Settings'
 import { Report } from './features/report/Report'
+import { Chat } from './features/chat/Chat'
 import { NotificationsPanel } from './components/notifications/NotificationsPanel'
 
 const pageTitles: Record<string, string> = {
@@ -19,6 +20,7 @@ const pageTitles: Record<string, string> = {
   '/weekly-plan': 'Weekly Plan',
   '/tasks': 'Tasks',
   '/team': 'Team',
+  '/chat': 'Team Chat',
   '/kpis': 'KPIs',
   '/data': 'Data & Sources',
   '/report': 'Client Report',
@@ -53,6 +55,8 @@ function App() {
         return <WeeklyPlan />
       case '/team':
         return <Team />
+      case '/chat':
+        return <Chat />
       case '/kpis':
         return <Kpis />
       case '/data':

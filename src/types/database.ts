@@ -180,6 +180,14 @@ export interface ActivityLog {
   created_at: string
 }
 
+export interface ChatMessage {
+  id: string
+  client_id: string
+  author_id: string
+  body: string
+  created_at: string
+}
+
 export type DataSourceId =
   | 'salla'
   | 'google_ads'

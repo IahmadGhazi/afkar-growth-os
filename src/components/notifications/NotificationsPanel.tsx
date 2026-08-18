@@ -77,7 +77,7 @@ export function NotificationsPanel({ open, onClose, onNavigate }: NotificationsP
               <button
                 key={notification.id}
                 onClick={() => openNotification(notification.id, notification.link)}
-                className={`w-full text-left glass-inset p-3.5 transition-colors hover:border-[rgba(77,99,242,0.35)] ${
+                className={`w-full text-left glass-inset p-3.5 transition-colors hover:border-[rgba(210,154,12,0.35)] ${
                   notification.is_read ? 'opacity-55' : ''
                 }`}
               >

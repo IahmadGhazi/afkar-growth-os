@@ -1,5 +1,6 @@
 import type {
   ActivityLog,
+  ChatMessage,
   Client,
   ClientAssignment,
   Connection,
@@ -31,6 +32,7 @@ export interface AppState {
   syncLog: SyncRun[]
   notifications: Notification[]
   activity: ActivityLog[]
+  messages: ChatMessage[]
   currentUserId: string | null
   currentClientId: string | null
 }
