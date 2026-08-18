@@ -93,10 +93,31 @@ export function kpiValueFor(state: AppState, kpiId: string): number {
 export function kpisForClient(state: AppState, clientId: string | null): KpiWithValue[] {
   if (!clientId) return []
   const definitions = state.kpiDefinitions.filter((kpi) => kpi.client_id === clientId)
+
+  // ROAS is a derived KPI: Sales / Spend. It auto-updates when the user
+  // provides only Spend and Sales (no manual ROAS entry needed).
+  const roasDefinition = definitions.find((d) => d.id === 'kpi_roas')
+  let roasCurrent = 0
+  let roasPrevious: number | null = null
+  if (roasDefinition) {
+    const salesSnaps = latestSnapshots(state.kpiSnapshots, 'kpi_revenue')
+    const spendSnaps = latestSnapshots(state.kpiSnapshots, 'kpi_spend')
+    const sales = salesSnaps[0]?.value ?? 0
+    const spend = spendSnaps[0]?.value ?? 0
+    const salesPrev = salesSnaps[1]?.value
+    const spendPrev = spendSnaps[1]?.value
+    roasCurrent = spend > 0 ? sales / spend : 0
+    roasPrevious = spendPrev && spendPrev > 0 && salesPrev != null ? salesPrev / spendPrev : null
+  }
+
   return definitions.map((definition) => {
     const snaps = latestSnapshots(state.kpiSnapshots, definition.id)
-    const current = snaps[0]?.value ?? 0
-    const previous = snaps[1]?.value ?? null
+    let current = snaps[0]?.value ?? 0
+    let previous: number | null = snaps[1]?.value ?? null
+    if (definition.id === 'kpi_roas') {
+      current = roasCurrent
+      previous = roasPrevious
+    }
     const targetRow = state.kpiTargets
       .filter((target) => target.kpi_id === definition.id)
       .sort((a, b) => b.period_start.localeCompare(a.period_start))[0]
@@ -140,7 +161,7 @@ export function departmentLabel(department: string | null | undefined): string {
 
 export function roleLabel(role: Profile['role']): string {
   const labels: Record<Profile['role'], string> = {
-    super_admin: 'Super Admin',
+    super_admin: 'Admin',
     account_manager: 'Account Manager',
     owner: 'Owner',
     seo: 'SEO Specialist',

@@ -348,6 +348,18 @@ export const actions = {
     })
   },
 
+  updateKpiName(kpiId: string, name: string) {
+    set((s) => ({
+      ...s,
+      kpiDefinitions: s.kpiDefinitions.map((d) =>
+        d.id === kpiId ? { ...d, name, updated_at: new Date().toISOString() } : d,
+      ),
+    }))
+    backend
+      .updateKpiDefinition(kpiId, { name, updated_at: new Date().toISOString() })
+      .catch((err) => console.error(err))
+  },
+
   setKpiValue(kpiId: string, value: number) {
     set((s) => {
       const clientId = s.currentClientId

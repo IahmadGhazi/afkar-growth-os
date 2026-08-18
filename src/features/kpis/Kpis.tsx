@@ -44,12 +44,21 @@ function KpiCard({ kpi }: { kpi: ReturnType<typeof kpisForClient>[number] }) {
   const { actions } = useApp()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(String(kpi.current))
+  const [editingName, setEditingName] = useState(false)
+  const [name, setName] = useState(kpi.name)
+  const isDerived = kpi.id === 'kpi_roas'
 
   const save = () => {
     const parsed = parseFloat(value)
     if (isNaN(parsed)) return
     actions.setKpiValue(kpi.id, parsed)
     setEditing(false)
+  }
+
+  const saveName = () => {
+    if (!name.trim()) return
+    actions.updateKpiName(kpi.id, name.trim())
+    setEditingName(false)
   }
 
   return (
@@ -67,11 +76,42 @@ function KpiCard({ kpi }: { kpi: ReturnType<typeof kpisForClient>[number] }) {
         </span>
       </div>
 
+      {editingName ? (
+        <div className="flex items-center gap-2 mb-1">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="field"
+            autoFocus
+          />
+          <button onClick={saveName} className="icon-btn icon-btn-success">
+            <Check size={15} />
+          </button>
+          <button onClick={() => setEditingName(false)} className="icon-btn icon-btn-danger">
+            <X size={15} />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 mb-1">
+          <div className="font-semibold text-[var(--text-primary)]">{kpi.name}</div>
+          {isDerived && (
+            <span className="badge bg-[var(--brand-soft)] text-[var(--brand)]">auto</span>
+          )}
+          <button
+            onClick={() => setEditingName(true)}
+            className="icon-btn"
+            aria-label="Edit KPI name"
+          >
+            <Pencil size={12} />
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 mb-1">
         <div className="text-2xl font-bold text-[var(--text-primary)]">
           {formatKpi(kpi.current, kpi.unit)}
         </div>
-        {!editing && (
+        {!editing && !isDerived && (
           <button
             onClick={() => setEditing(true)}
             className="icon-btn"
@@ -82,7 +122,9 @@ function KpiCard({ kpi }: { kpi: ReturnType<typeof kpisForClient>[number] }) {
         )}
       </div>
       <div className="text-sm text-[var(--text-muted)] mb-3">
-        Target: {formatKpi(kpi.target, kpi.unit)}
+        {isDerived
+          ? 'Calculated from Sales ÷ Spend'
+          : `Target: ${formatKpi(kpi.target, kpi.unit)}`}
       </div>
 
       {editing && (
