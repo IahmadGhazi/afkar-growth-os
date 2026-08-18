@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #ffffff;
+  --bg-secondary: #f9fafb;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --brand: #2563eb;
+  --brand-soft: rgba(37, 99, 235, 0.1);
+  --positive: #059669;
+  --positive-soft: rgba(5, 150, 105, 0.1);
+  --critical: #dc2626;
+  --critical-soft: rgba(220, 38, 38, 0.1);
+  --warning: #d97706;
+  --warning-soft: rgba(217, 119, 6, 0.1);
+}
+
+[data-theme="dark"] {
+  --bg: #09090b;
+  --bg-secondary: #18181b;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --brand: #3b82f6;
+  --brand-soft: rgba(59, 130, 246, 0.15);
+  --positive: #10b981;
+  --positive-soft: rgba(16, 185, 129, 0.15);
+  --critical: #ef4444;
+  --critical-soft: rgba(239, 68, 68, 0.15);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.15);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
