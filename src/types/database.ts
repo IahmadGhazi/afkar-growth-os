@@ -147,6 +147,16 @@ export interface KpiSnapshot {
   created_at: string
 }
 
+export interface KpiTarget {
+  id: string
+  kpi_id: string
+  client_id: string
+  period_start: string
+  period_end: string
+  target_value: number
+  created_at: string
+}
+
 export interface Notification {
   id: string
   user_id: string
@@ -168,4 +178,33 @@ export interface ActivityLog {
   action: string
   details: Record<string, unknown> | null
   created_at: string
+}
+
+export type DataSourceId =
+  | 'salla'
+  | 'google_ads'
+  | 'tiktok_ads'
+  | 'snap_ads'
+  | 'excel'
+  | 'google_sheets'
+  | 'manual'
+
+export interface Connection {
+  id: DataSourceId
+  client_id: string | null
+  connected: boolean
+  last_sync_at: string | null
+  sync_error: string | null
+  config: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SyncRun {
+  id: string
+  source: string
+  status: 'success' | 'error'
+  row_count: number
+  error: string | null
+  synced_at: string
 }

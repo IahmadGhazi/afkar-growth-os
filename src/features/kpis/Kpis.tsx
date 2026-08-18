@@ -1,175 +1,236 @@
-import { Plus } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Pencil, Check, X } from 'lucide-react'
+import { useApp, type KpiInput } from '../../lib/store'
+import { kpisForClient, departmentLabel, DEPARTMENT_LABELS } from '../../lib/selectors'
+import { SectionTitle, PrimaryButton } from '../../components/shared/ui'
+import type { Department, KpiDefinition } from '../../types/database'
 
-const kpis = [
-  {
-    name: 'ROAS',
-    department: 'Media',
-    current: 5.2,
-    target: 5,
-    unit: 'x',
-    direction: 'higher_better',
-    status: 'achieved',
-  },
-  {
-    name: 'Revenue',
-    department: 'Business',
-    current: 125400,
-    target: 150000,
-    unit: 'SAR',
-    direction: 'higher_better',
-    status: 'on_track',
-  },
-  {
-    name: 'Orders',
-    department: 'Business',
-    current: 1247,
-    target: 1500,
-    unit: '',
-    direction: 'higher_better',
-    status: 'on_track',
-  },
-  {
-    name: 'CAC',
-    department: 'Media',
-    current: 45,
-    target: 50,
-    unit: 'SAR',
-    direction: 'lower_better',
-    status: 'achieved',
-  },
-  {
-    name: 'AOV',
-    department: 'Business',
-    current: 320,
-    target: 350,
-    unit: 'SAR',
-    direction: 'higher_better',
-    status: 'at_risk',
-  },
-  {
-    name: 'Conversion Rate',
-    department: 'Business',
-    current: 2.8,
-    target: 3.5,
-    unit: '%',
-    direction: 'higher_better',
-    status: 'behind',
-  },
-  {
-    name: 'Organic Sessions',
-    department: 'SEO',
-    current: 4500,
-    target: 5000,
-    unit: '',
-    direction: 'higher_better',
-    status: 'on_track',
-  },
-  {
-    name: 'Content Output',
-    department: 'Social',
-    current: 15,
-    target: 15,
-    unit: 'pieces',
-    direction: 'higher_better',
-    status: 'achieved',
-  },
-]
-
-const statusColors = {
+const statusColors: Record<string, string> = {
   achieved: 'var(--positive)',
   on_track: 'var(--brand)',
   at_risk: 'var(--warning)',
   behind: 'var(--critical)',
 }
 
-const statusLabels = {
+const statusLabels: Record<string, string> = {
   achieved: 'Achieved',
   on_track: 'On Track',
   at_risk: 'At Risk',
   behind: 'Behind',
 }
 
+const units: Record<string, string> = {
+  currency: 'SAR',
+  percentage: '%',
+  count: '',
+  ratio: 'x',
+}
+
+const emptyForm: KpiInput = {
+  name: '',
+  department: null,
+  unit: 'count',
+  direction: 'higher_better',
+  target: 0,
+}
+
+function formatKpi(value: number, unit: KpiDefinition['unit'] | null): string {
+  const u = unit ? units[unit] : ''
+  const formatted = Number.isInteger(value) ? value.toLocaleString() : value.toFixed(1)
+  return `${formatted}${u ? ` ${u}` : ''}`
+}
+
+function KpiCard({ kpi }: { kpi: ReturnType<typeof kpisForClient>[number] }) {
+  const { actions } = useApp()
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(String(kpi.current))
+
+  const save = () => {
+    const parsed = parseFloat(value)
+    if (isNaN(parsed)) return
+    actions.setKpiValue(kpi.id, parsed)
+    setEditing(false)
+  }
+
+  return (
+    <div className="glass-card hover-lift p-5">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm text-[var(--text-muted)]">{departmentLabel(kpi.department)}</span>
+        <span
+          className="badge"
+          style={{
+            backgroundColor: `color-mix(in srgb, ${statusColors[kpi.status]} 15%, transparent)`,
+            color: statusColors[kpi.status],
+          }}
+        >
+          {statusLabels[kpi.status]}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 mb-1">
+        <div className="text-2xl font-bold text-[var(--text-primary)]">
+          {formatKpi(kpi.current, kpi.unit)}
+        </div>
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            className="icon-btn"
+            aria-label="Edit KPI value"
+          >
+            <Pencil size={13} />
+          </button>
+        )}
+      </div>
+      <div className="text-sm text-[var(--text-muted)] mb-3">
+        Target: {formatKpi(kpi.target, kpi.unit)}
+      </div>
+
+      {editing && (
+        <div className="flex items-center gap-2 mb-3">
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="field w-28"
+            autoFocus
+          />
+          <button onClick={save} className="icon-btn icon-btn-success">
+            <Check size={15} />
+          </button>
+          <button onClick={() => setEditing(false)} className="icon-btn icon-btn-danger">
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
+      <div className="h-2 bg-[rgba(22,26,34,0.07)] rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${kpi.progress}%`, backgroundColor: statusColors[kpi.status] }}
+        />
+      </div>
+    </div>
+  )
+}
+
 export function Kpis() {
+  const { state, actions } = useApp()
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState<KpiInput>(emptyForm)
+
+  const kpis = kpisForClient(state, state.currentClientId)
+
+  const submit = () => {
+    if (!form.name.trim()) return
+    actions.addKpi(form)
+    setForm(emptyForm)
+    setShowForm(false)
+  }
+
+  const departments = ['management', 'media', 'seo', 'social', 'design', 'product_research']
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-          Key Performance Indicators
-        </h2>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[var(--brand)] text-white rounded-lg text-sm font-medium hover:opacity-90">
-          <Plus size={16} />
-          Add KPI
-        </button>
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+            Key Performance Indicators
+          </h2>
+          <div className="text-sm text-[var(--text-muted)]">{kpis.length} active KPIs</div>
+        </div>
+        <PrimaryButton onClick={() => setShowForm(!showForm)}>
+          {showForm ? <X size={16} /> : <Plus size={16} />}
+          {showForm ? 'Close' : 'Add KPI'}
+        </PrimaryButton>
       </div>
 
-      {/* KPI Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpis.map((kpi, index) => {
-          const progress = kpi.direction === 'higher_better'
-            ? Math.min(100, (kpi.current / kpi.target) * 100)
-            : Math.min(100, (kpi.target / kpi.current) * 100)
-
-          return (
-            <div 
-              key={index}
-              className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]"
+      {showForm && (
+        <div className="glass-card p-5 space-y-3">
+          <SectionTitle>Add KPI</SectionTitle>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="KPI name (e.g. Email List Size)"
+              className="field md:col-span-2"
+            />
+            <select
+              value={form.department ?? ''}
+              onChange={(e) => setForm({ ...form, department: (e.target.value || null) as Department | null })}
+              className="field"
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-[var(--text-muted)]">{kpi.department}</span>
-                <span 
-                  className="px-2 py-0.5 rounded text-xs font-medium"
-                  style={{ 
-                    backgroundColor: `color-mix(in srgb, ${statusColors[kpi.status as keyof typeof statusColors]} 15%, transparent)`,
-                    color: statusColors[kpi.status as keyof typeof statusColors]
-                  }}
-                >
-                  {statusLabels[kpi.status as keyof typeof statusLabels]}
-                </span>
-              </div>
+              <option value="">Department</option>
+              {Object.entries(DEPARTMENT_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+            <select
+              value={form.unit ?? ''}
+              onChange={(e) => setForm({ ...form, unit: e.target.value as KpiDefinition['unit'] })}
+              className="field"
+            >
+              {(['currency', 'percentage', 'count', 'ratio'] as const).map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+            <select
+              value={form.direction ?? 'higher_better'}
+              onChange={(e) => setForm({ ...form, direction: e.target.value as KpiDefinition['direction'] })}
+              className="field"
+            >
+              <option value="higher_better">Higher is better</option>
+              <option value="lower_better">Lower is better</option>
+              <option value="target">Target value</option>
+            </select>
+            <input
+              type="number"
+              value={form.target || ''}
+              onChange={(e) => setForm({ ...form, target: parseFloat(e.target.value) || 0 })}
+              placeholder="Target"
+              className="field"
+            />
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={submit}
+              disabled={!form.name.trim()}
+              className="btn btn-primary"
+            >
+              Add KPI
+            </button>
+          </div>
+        </div>
+      )}
 
-              <div className="text-2xl font-bold text-[var(--text-primary)] mb-1">
-                {kpi.current.toLocaleString()}{kpi.unit && ` ${kpi.unit}`}
-              </div>
-
-              <div className="text-sm text-[var(--text-muted)] mb-3">
-                Target: {kpi.target.toLocaleString()}{kpi.unit && ` ${kpi.unit}`}
-              </div>
-
-              <div className="h-2 bg-[var(--border)] rounded-full overflow-hidden">
-                <div 
-                  className="h-full rounded-full transition-all"
-                  style={{ 
-                    width: `${progress}%`,
-                    backgroundColor: statusColors[kpi.status as keyof typeof statusColors]
-                  }}
-                />
-              </div>
-            </div>
-          )
-        })}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {kpis.map((kpi) => <KpiCard key={kpi.id} kpi={kpi} />)}
       </div>
+
+      {kpis.length === 0 && (
+        <div className="glass-card p-8 text-center text-sm text-[var(--text-muted)]">
+          No KPIs configured for this client yet.
+        </div>
+      )}
 
       {/* Department Summary */}
       <section>
-        <h2 className="text-sm font-medium text-[var(--text-muted)] uppercase tracking-wide mb-4">
-          Department KPIs
-        </h2>
+        <SectionTitle>Department KPIs</SectionTitle>
         <div className="space-y-4">
-          {['Media', 'SEO', 'Social', 'Business'].map((dept) => {
-            const deptKpis = kpis.filter(k => k.department === dept)
+          {departments.map((dept) => {
+            const deptKpis = kpis.filter((k) => (k.department ?? 'management') === dept)
+            if (deptKpis.length === 0) return null
             return (
-              <div 
-                key={dept}
-                className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]"
-              >
-                <div className="font-medium text-[var(--text-primary)] mb-3">{dept}</div>
+              <div key={dept} className="glass-card p-5">
+                <div className="font-semibold text-[var(--text-primary)] mb-3">
+                  {departmentLabel(dept)}
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {deptKpis.map((kpi, index) => (
-                    <div key={index}>
+                  {deptKpis.map((kpi) => (
+                    <div key={kpi.id}>
                       <div className="text-sm text-[var(--text-muted)]">{kpi.name}</div>
                       <div className="text-lg font-semibold text-[var(--text-primary)]">
-                        {kpi.current.toLocaleString()}{kpi.unit && ` ${kpi.unit}`}
+                        {formatKpi(kpi.current, kpi.unit)}
                       </div>
                     </div>
                   ))}

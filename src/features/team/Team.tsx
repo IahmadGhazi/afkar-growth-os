@@ -1,148 +1,152 @@
-import { 
-  Users, 
-  CheckCircle, 
-  Clock, 
+import { useState } from 'react'
+import {
+  Users,
+  CheckCircle,
+  Clock,
   AlertTriangle,
-  ArrowRight
+  X,
 } from 'lucide-react'
+import { useApp, type MemberInput } from '../../lib/store'
+import { teamMemberStats, roleLabel } from '../../lib/selectors'
+import { SectionTitle, PrimaryButton, EmptyState } from '../../components/shared/ui'
+import type { Profile } from '../../types/database'
 
-const teamMembers = [
-  {
-    id: '1',
-    name: 'Ahmad',
-    role: 'Designer',
-    department: 'Design',
-    avatar: null,
-    stats: {
-      activeTasks: 2,
-      completedToday: 1,
-      overdue: 0,
-    }
-  },
-  {
-    id: '2',
-    name: 'Sara',
-    role: 'SEO Specialist',
-    department: 'SEO',
-    avatar: null,
-    stats: {
-      activeTasks: 3,
-      completedToday: 2,
-      overdue: 0,
-    }
-  },
-  {
-    id: '3',
-    name: 'Mohammed',
-    role: 'Product Researcher',
-    department: 'Product Research',
-    avatar: null,
-    stats: {
-      activeTasks: 1,
-      completedToday: 3,
-      overdue: 1,
-    }
-  },
-  {
-    id: '4',
-    name: 'Ali',
-    role: 'Media Buyer',
-    department: 'Media',
-    avatar: null,
-    stats: {
-      activeTasks: 2,
-      completedToday: 1,
-      overdue: 0,
-    }
-  },
-  {
-    id: '5',
-    name: 'Fatima',
-    role: 'Social Media',
-    department: 'Social',
-    avatar: null,
-    stats: {
-      activeTasks: 1,
-      completedToday: 4,
-      overdue: 0,
-    }
-  },
+const emptyForm: MemberInput = {
+  fullName: '',
+  email: '',
+  role: 'viewer',
+}
+
+const roles: Profile['role'][] = [
+  'account_manager',
+  'seo',
+  'media_buyer',
+  'social_media',
+  'designer',
+  'product_research',
+  'viewer',
 ]
 
+function MemberCard({ member }: { member: Profile }) {
+  const { state } = useApp()
+  const stats = teamMemberStats(state, member)
+  return (
+    <div className="glass-card hover-lift p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#6177ff] to-[#4459e8] flex items-center justify-center shadow-[0_4px_12px_rgba(77,99,242,0.3)]">
+          <span className="text-sm font-bold text-white">
+            {member.full_name?.charAt(0) ?? '?'}
+          </span>
+        </div>
+        <div>
+          <div className="font-semibold text-[var(--text-primary)]">{member.full_name}</div>
+          <div className="text-sm text-[var(--text-muted)]">{roleLabel(member.role)}</div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 text-[var(--text-muted)]">
+            <Clock size={14} />
+            Active Tasks
+          </div>
+          <span className="font-medium text-[var(--text-primary)]">{stats.active}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 text-[var(--text-muted)]">
+            <CheckCircle size={14} />
+            Completed Today
+          </div>
+          <span className="font-medium text-[var(--positive)]">{stats.completedToday}</span>
+        </div>
+        {stats.overdue > 0 && (
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2 text-[var(--critical)]">
+              <AlertTriangle size={14} />
+              Overdue
+            </div>
+            <span className="font-medium text-[var(--critical)]">{stats.overdue}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function Team() {
+  const { state, actions } = useApp()
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState<MemberInput>(emptyForm)
+
+  const members = state.profiles.filter((profile) => profile.is_active)
+
+  const submit = () => {
+    if (!form.fullName.trim() || !form.email.trim()) return
+    actions.addMember(form)
+    setForm(emptyForm)
+    setShowForm(false)
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-          Team Members
-        </h2>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[var(--brand)] text-white rounded-lg text-sm font-medium hover:opacity-90">
-          <Users size={16} />
-          Add Member
-        </button>
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Team Members</h2>
+          <div className="text-sm text-[var(--text-muted)]">{members.length} active members</div>
+        </div>
+        <PrimaryButton onClick={() => setShowForm(!showForm)}>
+          {showForm ? <X size={16} /> : <Users size={16} />}
+          {showForm ? 'Close' : 'Add Member'}
+        </PrimaryButton>
       </div>
 
-      {/* Team Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {teamMembers.map((member) => (
-          <div 
-            key={member.id}
-            className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] hover:border-[var(--brand)] transition-colors cursor-pointer"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[var(--brand-soft)] flex items-center justify-center">
-                <span className="text-sm font-medium text-[var(--brand)]">
-                  {member.name.charAt(0)}
-                </span>
-              </div>
-              <div>
-                <div className="font-medium text-[var(--text-primary)]">{member.name}</div>
-                <div className="text-sm text-[var(--text-muted)]">{member.role}</div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2 text-[var(--text-muted)]">
-                  <Clock size={14} />
-                  Active Tasks
-                </div>
-                <span className="font-medium text-[var(--text-primary)]">
-                  {member.stats.activeTasks}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2 text-[var(--text-muted)]">
-                  <CheckCircle size={14} />
-                  Completed Today
-                </div>
-                <span className="font-medium text-[var(--positive)]">
-                  {member.stats.completedToday}
-                </span>
-              </div>
-              {member.stats.overdue > 0 && (
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2 text-[var(--critical)]">
-                    <AlertTriangle size={14} />
-                    Overdue
-                  </div>
-                  <span className="font-medium text-[var(--critical)]">
-                    {member.stats.overdue}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-[var(--border)]">
-              <button className="flex items-center gap-1 text-sm text-[var(--brand)] hover:underline">
-                View Work
-                <ArrowRight size={14} />
-              </button>
-            </div>
+      {showForm && (
+        <div className="glass-card p-5 space-y-3">
+          <SectionTitle>Add Team Member</SectionTitle>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input
+              type="text"
+              value={form.fullName}
+              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+              placeholder="Full name"
+              className="field"
+            />
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="Email"
+              className="field"
+            />
+            <select
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value as Profile['role'] })}
+              className="field"
+            >
+              {roles.map((role) => (
+                <option key={role} value={role}>{roleLabel(role)}</option>
+              ))}
+            </select>
           </div>
+          <div className="flex justify-end">
+            <button
+              onClick={submit}
+              disabled={!form.fullName.trim() || !form.email.trim()}
+              className="btn btn-primary"
+            >
+              Add Member
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {members.map((member) => (
+          <MemberCard key={member.id} member={member} />
         ))}
       </div>
+
+      {members.length === 0 && <EmptyState title="No team members yet" hint="Add your first member." />}
     </div>
   )
 }
