@@ -38,9 +38,11 @@ export function Sidebar({ currentPath, onNavigate, onOpenNotifications }: Sideba
     <aside className="glass-strong w-64 shrink-0 m-4 mr-0 rounded-[28px] flex flex-col overflow-hidden">
       {/* Brand */}
       <div className="flex items-center gap-3 px-6 pt-6 pb-4">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#6177ff] to-[#4459e8] flex items-center justify-center shadow-[0_6px_16px_rgba(77,99,242,0.35)]">
-          <span className="text-white font-extrabold text-base">A</span>
-        </div>
+        <img
+          src="/favicon.svg"
+          alt="AFKAR logo"
+          className="w-9 h-9 rounded-xl drop-shadow-[0_6px_16px_rgba(134,59,255,0.35)]"
+        />
         <div className="leading-tight">
           <div className="font-extrabold tracking-[0.04em] text-[var(--text-primary)]">
             AFKAR
