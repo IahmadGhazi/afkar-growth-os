@@ -239,7 +239,7 @@ export function Settings() {
             <div>
               <div className="font-medium text-[var(--text-primary)]">Local Data</div>
               <div className="text-sm text-[var(--text-muted)]">
-                All data lives in this browser. Reset restores the demo seed.
+                All data lives in this browser. Reset removes it and restores the Afkar baseline data.
               </div>
             </div>
           </div>
@@ -262,7 +262,7 @@ export function Settings() {
           ) : (
             <PrimaryButton onClick={() => setResetConfirm(true)}>
               <RotateCcw size={16} />
-              Reset Demo Data
+              Reset Local Data
             </PrimaryButton>
           )}
         </div>
