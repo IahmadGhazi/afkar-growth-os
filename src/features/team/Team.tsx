@@ -5,6 +5,8 @@ import {
   Clock,
   AlertTriangle,
   X,
+  Eye,
+  ArrowLeftRight,
 } from 'lucide-react'
 import { useApp, type MemberInput } from '../../lib/store'
 import { teamMemberStats, roleLabel } from '../../lib/selectors'
@@ -28,10 +30,11 @@ const roles: Profile['role'][] = [
 ]
 
 function MemberCard({ member }: { member: Profile }) {
-  const { state } = useApp()
+  const { state, actions } = useApp()
   const stats = teamMemberStats(state, member)
+  const isViewing = state.currentUserId === member.id
   return (
-    <div className="glass-card hover-lift p-5">
+    <div className={`glass-card hover-lift p-5 ${isViewing ? 'ring-2 ring-[var(--brand)]' : ''}`}>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#6177ff] to-[#4459e8] flex items-center justify-center shadow-[0_4px_12px_rgba(77,99,242,0.3)]">
           <span className="text-sm font-bold text-white">
@@ -39,7 +42,14 @@ function MemberCard({ member }: { member: Profile }) {
           </span>
         </div>
         <div>
-          <div className="font-semibold text-[var(--text-primary)]">{member.full_name}</div>
+          <div className="flex items-center gap-2">
+            <div className="font-semibold text-[var(--text-primary)]">{member.full_name}</div>
+            {isViewing && (
+              <span className="badge bg-[var(--brand-soft)] text-[var(--brand)]">
+                <Eye size={10} /> Viewing
+              </span>
+            )}
+          </div>
           <div className="text-sm text-[var(--text-muted)]">{roleLabel(member.role)}</div>
         </div>
       </div>
@@ -69,6 +79,14 @@ function MemberCard({ member }: { member: Profile }) {
           </div>
         )}
       </div>
+
+      <button
+        onClick={() => actions.setCurrentUser(member.id)}
+        className={`btn w-full mt-4 ${isViewing ? 'btn-outline' : 'btn-primary'}`}
+      >
+        <Eye size={15} />
+        {isViewing ? 'Currently viewing' : `View as ${member.full_name}`}
+      </button>
     </div>
   )
 }
@@ -79,6 +97,8 @@ export function Team() {
   const [form, setForm] = useState<MemberInput>(emptyForm)
 
   const members = state.profiles.filter((profile) => profile.is_active)
+  const viewing = state.profiles.find((profile) => profile.id === state.currentUserId)
+  const isAdminView = state.currentUserId === state.profiles.find((p) => p.role === 'super_admin')?.id
 
   const submit = () => {
     if (!form.fullName.trim() || !form.email.trim()) return
@@ -99,6 +119,34 @@ export function Team() {
           {showForm ? 'Close' : 'Add Member'}
         </PrimaryButton>
       </div>
+
+      {!isAdminView && (
+        <div className="glass-card p-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-l-[var(--brand)]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#6177ff] to-[#4459e8] flex items-center justify-center">
+              <span className="text-sm font-bold text-white">{viewing?.full_name?.charAt(0) ?? '?'}</span>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-[var(--text-primary)]">
+                Viewing as {viewing?.full_name} — {viewing ? roleLabel(viewing.role) : ''}
+              </div>
+              <div className="text-xs text-[var(--text-muted)]">
+                My Work, notifications and the top bar now show this member's perspective.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const admin = state.profiles.find((p) => p.role === 'super_admin')
+              if (admin) actions.setCurrentUser(admin.id)
+            }}
+            className="btn btn-outline"
+          >
+            <ArrowLeftRight size={15} />
+            Back to admin
+          </button>
+        </div>
+      )}
 
       {showForm && (
         <div className="glass-card p-5 space-y-3">

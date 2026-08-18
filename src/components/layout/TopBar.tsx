@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Store, Settings, Sun, Moon } from 'lucide-react'
+import { Plus, Store, Settings, Sun, Moon, Eye, ArrowLeftRight } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { currentClient, currentUser, roleLabel } from '../../lib/selectors'
 import { getStoredTheme, applyTheme, type Theme } from '../../lib/theme'
@@ -11,9 +11,11 @@ interface TopBarProps {
 }
 
 export function TopBar({ title, onQuickAdd, onNavigate }: TopBarProps) {
-  const { state } = useApp()
+  const { state, actions } = useApp()
   const client = currentClient(state)
   const user = currentUser(state)
+  const admin = state.profiles.find((p) => p.role === 'super_admin')
+  const viewingAsMember = !!admin && state.currentUserId !== admin.id
   const [theme, setTheme] = useState<Theme>(getStoredTheme())
 
   const toggleTheme = () => {
@@ -34,6 +36,22 @@ export function TopBar({ title, onQuickAdd, onNavigate }: TopBarProps) {
           <div className="chip">
             <Store size={13} className="text-[var(--brand)]" />
             <span className="text-[var(--text-primary)] font-semibold">{client.name}</span>
+          </div>
+        )}
+
+        {/* Viewing-as indicator */}
+        {viewingAsMember && (
+          <div className="chip !border-[var(--brand)] bg-[var(--brand-soft)]">
+            <Eye size={13} className="text-[var(--brand)]" />
+            <span className="text-[var(--brand)] font-semibold">Viewing as {user?.full_name}</span>
+            <button
+              onClick={() => admin && actions.setCurrentUser(admin.id)}
+              className="ml-1 inline-flex items-center gap-1 text-[var(--brand)] font-semibold hover:underline"
+              title="Back to admin view"
+            >
+              <ArrowLeftRight size={12} />
+              Admin
+            </button>
           </div>
         )}
 
