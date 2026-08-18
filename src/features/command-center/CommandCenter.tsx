@@ -2,9 +2,7 @@ import {
   TrendingUp, 
   TrendingDown, 
   AlertTriangle, 
-  CheckCircle, 
   Clock,
-  Users,
   Target,
   ArrowRight
 } from 'lucide-react'

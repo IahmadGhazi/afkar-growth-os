@@ -1,9 +1,7 @@
 import { 
   Building2, 
   Users, 
-  Key, 
   Bell,
-  Palette,
   Database
 } from 'lucide-react'
 

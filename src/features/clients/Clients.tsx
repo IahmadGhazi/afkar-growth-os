@@ -1,7 +1,5 @@
 import { 
   Building2, 
-  TrendingUp, 
-  Users,
   ArrowRight
 } from 'lucide-react'
 

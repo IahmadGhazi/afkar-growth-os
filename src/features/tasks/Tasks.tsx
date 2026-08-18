@@ -1,12 +1,8 @@
 import { useState } from 'react'
 import { 
   Plus, 
-  Filter, 
   Search,
-  ArrowRight,
-  Clock,
-  AlertTriangle,
-  CheckCircle
+  Clock
 } from 'lucide-react'
 
 type TaskStatus = 'backlog' | 'planned' | 'in_progress' | 'review' | 'approved' | 'done' | 'blocked'

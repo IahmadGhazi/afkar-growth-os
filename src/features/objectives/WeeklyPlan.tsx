@@ -3,7 +3,6 @@ import {
   TrendingUp, 
   TrendingDown, 
   Minus,
-  ChevronRight,
   Plus
 } from 'lucide-react'
 

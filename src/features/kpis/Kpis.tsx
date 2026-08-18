@@ -1,10 +1,4 @@
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Minus,
-  Target,
-  Plus
-} from 'lucide-react'
+import { Plus } from 'lucide-react'
 
 const kpis = [
   {
