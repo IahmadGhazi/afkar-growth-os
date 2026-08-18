@@ -1,0 +1,33 @@
+# The Supabase keeper: a scheduled Worker that pings the project so the free
+# tier's 7-day inactivity pause can never take the app down silently.
+# Deploy: npm run keeper:deploy
+#
+# BOTH VALUES BELOW ARE PUBLIC BY DESIGN, which is why they sit in a committed
+# config file rather than in a secret. The project URL is in every request the
+# browser makes, and the anon key is already inside the shipped JS bundle: it
+# grants nothing on its own, because every table is behind RLS and every policy
+# keys off the signed-in user, not off this key. The dangerous one is the
+# SERVICE ROLE key, and it appears nowhere in this repo.
+#
+# THE ANON KEY IS NOT OPTIONAL HERE, even though the Worker will run without it.
+# Without it the pings come back 401 from the API gateway, and a request that
+# never reaches Postgres is not database activity. The pause this Worker exists
+# to prevent is measured on DATABASE activity, so an unauthenticated ping is a
+# Worker that looks healthy in the logs while the project quietly sleeps.
+name = "afkar-supabase-keeper"
+main = "src/index.ts"
+compatibility_date = "2026-08-18"
+
+# NO PUBLIC URL. This Worker only exports `scheduled`; it has no fetch handler,
+# so a workers.dev address would serve nothing and exist only as surface area.
+# Leaving this out is also what made the first deploy fail: wrangler tried to
+# register a workers.dev subdomain, found "portal" taken, and refused to publish
+# a Worker that never needed an address at all.
+workers_dev = false
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+[vars]
+SUPABASE_URL = "https://dyaxdqlngtlwqtvtmgck.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5YXhkcWxuZ3Rsd3F0dnRtZ2NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwNzE5NTcsImV4cCI6MjEwMjY0Nzk1N30.5wJ5uCiQvQ4KmQpL4UXoZJraSium-LVQvBrFCJ_cXgc"

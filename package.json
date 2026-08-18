@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "keeper:deploy": "wrangler deploy --config worker/keeper/wrangler.toml"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
