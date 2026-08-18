@@ -39,18 +39,10 @@ export function Sidebar({ currentPath, onNavigate, onOpenNotifications }: Sideba
       {/* Brand */}
       <div className="flex items-center gap-3 px-6 pt-6 pb-4">
         <img
-          src="/favicon.svg"
+          src="/logo.png"
           alt="AFKAR logo"
-          className="w-9 h-9 rounded-xl drop-shadow-[0_6px_16px_rgba(134,59,255,0.35)]"
+          className="h-10 w-auto rounded-xl object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.25)]"
         />
-        <div className="leading-tight">
-          <div className="font-extrabold tracking-[0.04em] text-[var(--text-primary)]">
-            AFKAR
-          </div>
-          <div className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.14em]">
-            Growth OS
-          </div>
-        </div>
       </div>
 
       {/* Navigation */}
