@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Store, Settings, Sun, Moon, Eye, ArrowLeftRight } from 'lucide-react'
+import { Plus, Store, Settings, Sun, Moon, Eye, ArrowLeftRight, Menu } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { currentClient, currentUser, roleLabel } from '../../lib/selectors'
 import { getStoredTheme, applyTheme, type Theme } from '../../lib/theme'
@@ -8,9 +8,10 @@ interface TopBarProps {
   title: string
   onQuickAdd?: () => void
   onNavigate?: (path: string) => void
+  onMenuClick?: () => void
 }
 
-export function TopBar({ title, onQuickAdd, onNavigate }: TopBarProps) {
+export function TopBar({ title, onQuickAdd, onNavigate, onMenuClick }: TopBarProps) {
   const { state, actions } = useApp()
   const client = currentClient(state)
   const user = currentUser(state)
@@ -25,15 +26,22 @@ export function TopBar({ title, onQuickAdd, onNavigate }: TopBarProps) {
   }
 
   return (
-    <header className="glass-strong mx-4 mt-4 mb-2 rounded-2xl h-16 flex items-center justify-between px-5 shrink-0">
-      <div className="flex items-center gap-4 min-w-0">
-        <h1 className="text-lg font-bold text-[var(--text-primary)] truncate">{title}</h1>
+    <header className="glass-strong mx-3 sm:mx-4 mt-3 sm:mt-4 mb-2 rounded-2xl h-14 sm:h-16 flex items-center justify-between gap-2 px-3 sm:px-5 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <button
+          onClick={onMenuClick}
+          aria-label="Open navigation"
+          className="icon-btn w-9 h-9 rounded-xl lg:hidden shrink-0"
+        >
+          <Menu size={19} />
+        </button>
+        <h1 className="text-base sm:text-lg font-bold text-[var(--text-primary)] truncate">{title}</h1>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         {/* Client chip (single client) */}
         {client && (
-          <div className="chip">
+          <div className="chip hidden md:inline-flex">
             <Store size={13} className="text-[var(--brand)]" />
             <span className="text-[var(--text-primary)] font-semibold">{client.name}</span>
           </div>
@@ -41,7 +49,7 @@ export function TopBar({ title, onQuickAdd, onNavigate }: TopBarProps) {
 
         {/* Viewing-as indicator */}
         {viewingAsMember && (
-          <div className="chip !border-[var(--brand)] bg-[var(--brand-soft)]">
+          <div className="chip !border-[var(--brand)] bg-[var(--brand-soft)] hidden sm:inline-flex">
             <Eye size={13} className="text-[var(--brand)]" />
             <span className="text-[var(--brand)] font-semibold">Viewing as {user?.full_name}</span>
             <button
@@ -56,7 +64,7 @@ export function TopBar({ title, onQuickAdd, onNavigate }: TopBarProps) {
         )}
 
         {/* Quick Add */}
-        <button onClick={onQuickAdd} className="btn btn-primary">
+        <button onClick={onQuickAdd} className="btn btn-primary !px-2.5 sm:!px-3">
           <Plus size={16} strokeWidth={2.4} />
           <span className="hidden sm:inline">Quick Add</span>
           <span className="hidden lg:inline text-xs font-semibold opacity-80">⌘K</span>

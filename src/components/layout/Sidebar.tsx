@@ -36,8 +36,10 @@ export function Sidebar({ currentPath, onNavigate, onOpenNotifications }: Sideba
     (n) => (!currentUser || n.user_id === currentUser.id) && !n.is_read,
   ).length
   const hasNotifications = unread > 0
-  return (
-    <aside className="glass-strong w-64 shrink-0 m-4 mr-0 rounded-[28px] flex flex-col overflow-hidden">
+    return (
+    <aside className="glass-strong w-full h-full lg:w-64 lg:h-auto lg:m-4 lg:mr-0 rounded-none lg:rounded-[28px] flex flex-col overflow-hidden">
+
+
       {/* Brand */}
       <div className="flex items-center gap-3 px-6 pt-6 pb-4">
         <img
