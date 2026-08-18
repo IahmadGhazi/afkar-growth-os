@@ -42,7 +42,7 @@ function ConnectionCard({ sourceId }: { sourceId: DataSourceId }) {
           className={`badge ${
             connection?.connected
               ? 'bg-[var(--positive-soft)] text-[var(--positive)]'
-              : 'bg-[rgba(22,26,34,0.06)] text-[var(--text-muted)]'
+              : 'bg-[var(--track)] text-[var(--text-muted)]'
           }`}
         >
           {connection?.connected ? 'Connected' : 'Not connected'}
@@ -134,7 +134,7 @@ function ManualEntry() {
 
   if (kpis.length === 0) {
     return (
-      <div className="p-6 rounded-2xl border border-dashed border-[var(--border)] bg-[rgba(255,255,255,0.35)] text-center text-sm text-[var(--text-muted)]">
+      <div className="p-6 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] text-center text-sm text-[var(--text-muted)]">
         No KPIs for this client yet. Add one on the KPIs page first.
       </div>
     )
@@ -338,7 +338,7 @@ function SheetSources() {
           <div className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">
             <FileSpreadsheet size={16} className="text-[var(--brand)]" /> Excel workbook
           </div>
-          <span className={`badge ${excelConnection?.connected ? 'bg-[var(--positive-soft)] text-[var(--positive)]' : 'bg-[rgba(22,26,34,0.06)] text-[var(--text-muted)]'}`}>
+          <span className={`badge ${excelConnection?.connected ? 'bg-[var(--positive-soft)] text-[var(--positive)]' : 'bg-[var(--track)] text-[var(--text-muted)]'}`}>
             {excelConnection?.connected ? 'Synced' : 'Not synced'}
           </span>
         </div>
@@ -381,7 +381,7 @@ function SheetSources() {
           <div className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">
             <Download size={16} className="text-[var(--brand)]" /> Google Sheets
           </div>
-          <span className={`badge ${sheetsConnection?.connected ? 'bg-[var(--positive-soft)] text-[var(--positive)]' : 'bg-[rgba(22,26,34,0.06)] text-[var(--text-muted)]'}`}>
+          <span className={`badge ${sheetsConnection?.connected ? 'bg-[var(--positive-soft)] text-[var(--positive)]' : 'bg-[var(--track)] text-[var(--text-muted)]'}`}>
             {sheetsConnection?.connected ? 'Connected' : 'Not connected'}
           </span>
         </div>
@@ -483,7 +483,7 @@ export function Data() {
       <section>
         <SectionTitle>Sync Log</SectionTitle>
         {state.syncLog.length === 0 ? (
-          <div className="p-4 rounded-2xl border border-dashed border-[var(--border)] bg-[rgba(255,255,255,0.35)] text-center text-sm text-[var(--text-muted)]">
+          <div className="p-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] text-center text-sm text-[var(--text-muted)]">
             No syncs yet.
           </div>
         ) : (

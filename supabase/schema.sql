@@ -262,8 +262,8 @@ on conflict (id) do nothing;
 
 -- 2 ADMIN users
 insert into public.profiles (id, organization_id, email, full_name, avatar_url, role, is_active, created_at, updated_at) values
-  ('usr_omar', 'org_afkar', 'omar@afkar-growth.com', 'Omar', null, 'account_manager', true, now(), now()),
-  ('usr_ahmad', 'org_afkar', 'ahmad@afkar-growth.com', 'Ahmad', null, 'super_admin', true, now(), now())
+  ('usr_omar', 'org_afkar', 'ibrahim@afkar-growth.com', 'Ibrahim', null, 'super_admin', true, now(), now()),
+  ('usr_ahmad', 'org_afkar', 'ahmad@afkar-growth.com', 'Ahmad', null, 'account_manager', true, now(), now())
 on conflict (id) do nothing;
 
 -- testing users
@@ -331,7 +331,15 @@ insert into public.kpi_definitions (id, client_id, name, department, unit, direc
   ('kpi_tiktok_spend', 'cli_afkar', 'TikTok Spend', 'media', 'currency', 'lower_better', 'tiktok_ads', true, now(), now()),
   ('kpi_tiktok_sales', 'cli_afkar', 'TikTok Sales', 'management', 'currency', 'higher_better', 'tiktok_ads', true, now(), now()),
   ('kpi_google_spend', 'cli_afkar', 'Google Ads Spend', 'media', 'currency', 'lower_better', 'google_ads', true, now(), now()),
-  ('kpi_google_sales', 'cli_afkar', 'Google Ads Sales', 'management', 'currency', 'higher_better', 'google_ads', true, now(), now())
+  ('kpi_google_sales', 'cli_afkar', 'Google Ads Sales', 'management', 'currency', 'higher_better', 'google_ads', true, now(), now()),
+  ('kpi_add_to_cart', 'cli_afkar', 'Add to Cart', 'management', 'count', 'higher_better', 'salla', true, now(), now()),
+  ('kpi_abandoned_carts', 'cli_afkar', 'Abandoned Carts', 'management', 'count', 'lower_better', 'salla', true, now(), now()),
+  ('kpi_cart_conv', 'cli_afkar', 'Cart Conversion Rate', 'management', 'percentage', 'higher_better', 'salla', true, now(), now()),
+  ('kpi_cart_recovery', 'cli_afkar', 'Cart Recovery Rate', 'management', 'percentage', 'higher_better', 'manual', true, now(), now()),
+  ('kpi_new_customers', 'cli_afkar', 'New Customers', 'management', 'count', 'higher_better', 'salla', true, now(), now()),
+  ('kpi_repeat_customers', 'cli_afkar', 'Repeat Customers', 'management', 'count', 'higher_better', 'salla', true, now(), now()),
+  ('kpi_repeat_rate', 'cli_afkar', 'Repeat Purchase Rate', 'management', 'percentage', 'higher_better', 'manual', true, now(), now()),
+  ('kpi_customer_list', 'cli_afkar', 'Customer List Size', 'management', 'count', 'higher_better', 'manual', true, now(), now())
 on conflict (id) do nothing;
 
 -- KPI targets
@@ -352,7 +360,15 @@ insert into public.kpi_targets (id, kpi_id, client_id, period_start, period_end,
   ('target_tiktok_spend', 'kpi_tiktok_spend', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 32000, now()),
   ('target_tiktok_sales', 'kpi_tiktok_sales', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 320000, now()),
   ('target_google_spend', 'kpi_google_spend', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 29000, now()),
-  ('target_google_sales', 'kpi_google_sales', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 270000, now())
+  ('target_google_sales', 'kpi_google_sales', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 270000, now()),
+  ('target_add_to_cart', 'kpi_add_to_cart', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 90000, now()),
+  ('target_abandoned_carts', 'kpi_abandoned_carts', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 60000, now()),
+  ('target_cart_conv', 'kpi_cart_conv', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 12, now()),
+  ('target_cart_recovery', 'kpi_cart_recovery', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 15, now()),
+  ('target_new_customers', 'kpi_new_customers', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 520, now()),
+  ('target_repeat_customers', 'kpi_repeat_customers', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 240, now()),
+  ('target_repeat_rate', 'kpi_repeat_rate', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 30, now()),
+  ('target_customer_list', 'kpi_customer_list', 'cli_afkar', (date_trunc('week', now()))::date, ((date_trunc('week', now()) + interval '6 days'))::date, 6000, now())
 on conflict (id) do nothing;
 
 -- KPI snapshots (6 weeks of history, ending this week)
@@ -422,7 +438,15 @@ insert into public.kpi_snapshots (id, kpi_id, client_id, snapshot_date, value, s
   ('snap_kpi_tiktok_spend_5', 'kpi_tiktok_spend', 'cli_afkar', (date_trunc('week', now()))::date, 30000, 'manual', null, now()),
   ('snap_kpi_tiktok_sales_5', 'kpi_tiktok_sales', 'cli_afkar', (date_trunc('week', now()))::date, 300000, 'manual', null, now()),
   ('snap_kpi_google_spend_5', 'kpi_google_spend', 'cli_afkar', (date_trunc('week', now()))::date, 27000, 'manual', null, now()),
-  ('snap_kpi_google_sales_5', 'kpi_google_sales', 'cli_afkar', (date_trunc('week', now()))::date, 258810.8, 'manual', null, now())
+  ('snap_kpi_google_sales_5', 'kpi_google_sales', 'cli_afkar', (date_trunc('week', now()))::date, 258810.8, 'manual', null, now()),
+  ('snap_kpi_add_to_cart_5', 'kpi_add_to_cart', 'cli_afkar', (date_trunc('week', now()))::date, 78294, 'manual', null, now()),
+  ('snap_kpi_abandoned_carts_5', 'kpi_abandoned_carts', 'cli_afkar', (date_trunc('week', now()))::date, 70636, 'manual', null, now()),
+  ('snap_kpi_cart_conv_5', 'kpi_cart_conv', 'cli_afkar', (date_trunc('week', now()))::date, 9.8, 'manual', null, now()),
+  ('snap_kpi_cart_recovery_5', 'kpi_cart_recovery', 'cli_afkar', (date_trunc('week', now()))::date, 8.2, 'manual', null, now()),
+  ('snap_kpi_new_customers_5', 'kpi_new_customers', 'cli_afkar', (date_trunc('week', now()))::date, 462, 'manual', null, now()),
+  ('snap_kpi_repeat_customers_5', 'kpi_repeat_customers', 'cli_afkar', (date_trunc('week', now()))::date, 214, 'manual', null, now()),
+  ('snap_kpi_repeat_rate_5', 'kpi_repeat_rate', 'cli_afkar', (date_trunc('week', now()))::date, 24.5, 'manual', null, now()),
+  ('snap_kpi_customer_list_5', 'kpi_customer_list', 'cli_afkar', (date_trunc('week', now()))::date, 554, 'manual', null, now())
 on conflict (id) do nothing;
 
 -- Connections

@@ -1,6 +1,8 @@
-import { Plus, Store, Settings } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Store, Settings, Sun, Moon } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { currentClient, currentUser, roleLabel } from '../../lib/selectors'
+import { getStoredTheme, applyTheme, type Theme } from '../../lib/theme'
 
 interface TopBarProps {
   title: string
@@ -12,6 +14,13 @@ export function TopBar({ title, onQuickAdd, onNavigate }: TopBarProps) {
   const { state } = useApp()
   const client = currentClient(state)
   const user = currentUser(state)
+  const [theme, setTheme] = useState<Theme>(getStoredTheme())
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    applyTheme(next)
+  }
 
   return (
     <header className="glass-strong mx-4 mt-4 mb-2 rounded-2xl h-16 flex items-center justify-between px-5 shrink-0">
@@ -35,6 +44,16 @@ export function TopBar({ title, onQuickAdd, onNavigate }: TopBarProps) {
           <span className="hidden lg:inline text-xs font-semibold opacity-80">⌘K</span>
         </button>
 
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-label="Toggle dark mode"
+          className="icon-btn w-9 h-9 rounded-xl"
+        >
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+
         {/* Settings */}
         <button
           onClick={() => onNavigate?.('/settings')}
@@ -48,7 +67,7 @@ export function TopBar({ title, onQuickAdd, onNavigate }: TopBarProps) {
         {/* User */}
         <button
           onClick={() => onNavigate?.('/settings')}
-          className="flex items-center gap-2.5 pl-1.5 pr-2 py-1.5 rounded-xl hover:bg-[rgba(22,26,34,0.05)] transition-colors"
+          className="flex items-center gap-2.5 pl-1.5 pr-2 py-1.5 rounded-xl hover:bg-[var(--hover)] transition-colors"
         >
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#6177ff] to-[#4459e8] flex items-center justify-center shadow-[0_4px_12px_rgba(77,99,242,0.3)]">
             {user?.full_name ? (

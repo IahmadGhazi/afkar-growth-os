@@ -157,7 +157,7 @@ export function WeeklyPlan() {
               </div>
             </div>
 
-            <div className="h-2.5 bg-[rgba(22,26,34,0.07)] rounded-full overflow-hidden mb-6">
+            <div className="h-2.5 bg-[var(--track)] rounded-full overflow-hidden mb-6">
               <div
                 className="h-full bg-gradient-to-r from-[#6177ff] to-[#4459e8] rounded-full transition-all"
                 style={{ width: `${objective.progress_pct}%` }}
@@ -191,7 +191,7 @@ export function WeeklyPlan() {
                   <div className="text-xs text-[var(--text-muted)]">{dept.done}/{dept.total} done</div>
                 </div>
               </div>
-              <div className="h-2 bg-[rgba(22,26,34,0.07)] rounded-full overflow-hidden mb-3">
+              <div className="h-2 bg-[var(--track)] rounded-full overflow-hidden mb-3">
                 <div
                   className={`h-full rounded-full transition-all ${
                     dept.progress === 100
@@ -214,7 +214,7 @@ export function WeeklyPlan() {
                         ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
                         : task.status === 'blocked'
                         ? 'bg-[var(--critical-soft)] text-[var(--critical)]'
-                        : 'bg-[rgba(22,26,34,0.05)] text-[var(--text-muted)]'
+                        : 'bg-[var(--track)] text-[var(--text-muted)]'
                     }`}
                   >
                     {task.title}

@@ -29,7 +29,7 @@ function Toggle({
       aria-label={label}
       onClick={() => onChange(!checked)}
       className={`relative w-10 h-6 rounded-full transition-colors duration-150 ${
-        checked ? 'bg-[var(--positive)]' : 'bg-[rgba(22,26,34,0.18)]'
+        checked ? 'bg-[var(--positive)]' : 'bg-[var(--track)]'
       }`}
     >
       <span
@@ -242,7 +242,7 @@ export function Settings() {
             </div>
           </div>
           <div className="flex items-center gap-2 text-sm">
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${backendAvailable ? 'bg-[var(--positive-soft)] text-[var(--positive)]' : 'bg-[rgba(22,26,34,0.06)] text-[var(--text-muted)]'}`}>
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${backendAvailable ? 'bg-[var(--positive-soft)] text-[var(--positive)]' : 'bg-[var(--track)] text-[var(--text-muted)]'}`}>
               <Check size={12} />
               {backendAvailable ? 'Connected' : 'Disconnected'}
             </span>

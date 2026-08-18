@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   color-scheme: light;
   --bg: #f6f7f9;
@@ -25,6 +27,11 @@
   --shadow-soft: 0 1px 1px rgba(22, 26, 34, 0.04), 0 6px 18px rgba(22, 26, 34, 0.06);
   --shadow-lift: 0 2px 4px rgba(22, 26, 34, 0.05), 0 18px 44px rgba(22, 26, 34, 0.12);
   --ring: 0 0 0 3px rgba(77, 99, 242, 0.16);
+  --surface: rgba(255, 255, 255, 0.62);
+  --surface-solid: #ffffff;
+  --track: rgba(22, 26, 34, 0.07);
+  --hover: rgba(22, 26, 34, 0.05);
+  --skeleton: rgba(22, 26, 34, 0.08);
 }
 
 [data-theme="dark"] {
@@ -52,6 +59,11 @@
   --shadow-soft: 0 1px 1px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.3);
   --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 20px 48px rgba(0, 0, 0, 0.45);
   --ring: 0 0 0 3px rgba(114, 133, 255, 0.22);
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-solid: #14171f;
+  --track: rgba(255, 255, 255, 0.1);
+  --hover: rgba(255, 255, 255, 0.06);
+  --skeleton: rgba(255, 255, 255, 0.08);
 }
 
 * {

@@ -10,7 +10,7 @@ export function PriorityBadge({ priority }: { priority: TaskPriority }) {
         priority === 'critical' && 'bg-[var(--critical-soft)] text-[var(--critical)]',
         priority === 'high' && 'bg-[var(--warning-soft)] text-[var(--warning)]',
         priority === 'medium' && 'bg-[var(--brand-soft)] text-[var(--brand)]',
-        priority === 'low' && 'bg-[rgba(22,26,34,0.06)] text-[var(--text-muted)]',
+        priority === 'low' && 'bg-[var(--track)] text-[var(--text-muted)]',
       )}
     >
       {priority}
@@ -24,7 +24,7 @@ export function StatusDot({ color }: { color: string }) {
 
 export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] bg-[rgba(255,255,255,0.35)] text-center">
+    <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] text-center">
       <div className="text-sm font-medium text-[var(--text-secondary)]">{title}</div>
       {hint && <div className="text-sm text-[var(--text-muted)] mt-1">{hint}</div>}
     </div>

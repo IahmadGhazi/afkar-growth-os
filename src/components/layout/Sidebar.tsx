@@ -63,7 +63,7 @@ export function Sidebar({ currentPath, onNavigate, onOpenNotifications }: Sideba
                 'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
                 isActive
                   ? 'bg-[var(--brand-soft)] text-[var(--brand)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[rgba(22,26,34,0.05)] hover:text-[var(--text-primary)]',
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]',
               )}
             >
               <item.icon size={17} strokeWidth={isActive ? 2.2 : 1.9} />
@@ -81,7 +81,7 @@ export function Sidebar({ currentPath, onNavigate, onOpenNotifications }: Sideba
             'w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150',
             currentPath === '/report'
               ? 'bg-[var(--brand-soft)] text-[var(--brand)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]'
-              : 'text-[var(--text-secondary)] hover:bg-[rgba(22,26,34,0.05)] hover:text-[var(--text-primary)]',
+              : 'text-[var(--text-secondary)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]',
           )}
         >
           <FileText size={17} />
@@ -91,7 +91,7 @@ export function Sidebar({ currentPath, onNavigate, onOpenNotifications }: Sideba
           onClick={onOpenNotifications}
           className={cn(
             'w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150',
-            'text-[var(--text-secondary)] hover:bg-[rgba(22,26,34,0.05)] hover:text-[var(--text-primary)]',
+            'text-[var(--text-secondary)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]',
           )}
         >
           <div className="relative">

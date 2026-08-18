@@ -103,7 +103,7 @@ function KpiCard({ kpi }: { kpi: ReturnType<typeof kpisForClient>[number] }) {
         </div>
       )}
 
-      <div className="h-2 bg-[rgba(22,26,34,0.07)] rounded-full overflow-hidden">
+      <div className="h-2 bg-[var(--track)] rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${kpi.progress}%`, backgroundColor: statusColors[kpi.status] }}

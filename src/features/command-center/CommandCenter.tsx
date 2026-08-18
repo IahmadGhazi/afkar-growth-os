@@ -226,7 +226,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
         <div className="glass-card p-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {platform.rows.map((row) => (
-              <div key={row.platform} className="rounded-xl border border-[rgba(22,26,34,0.08)] p-4">
+              <div key={row.platform} className="rounded-xl border border-[var(--border)] p-4">
                 <div className="text-sm font-semibold text-[var(--text-primary)]">{row.platform}</div>
                 <div className="mt-2 space-y-1 text-sm">
                   <div className="flex items-center justify-between">
@@ -247,7 +247,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
               </div>
             ))}
           </div>
-          <div className="mt-4 flex flex-wrap gap-x-8 gap-y-2 border-t border-[rgba(22,26,34,0.08)] pt-4 text-sm">
+          <div className="mt-4 flex flex-wrap gap-x-8 gap-y-2 border-t border-[var(--border)] pt-4 text-sm">
             <div>
               <span className="text-[var(--text-muted)]">Total overall spend across all platforms: </span>
               <span className="font-bold text-[var(--text-primary)]">{compact(platform.totalSpend)} SAR</span>
@@ -535,7 +535,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
                 </span>
                 <span className="ml-auto text-sm text-[var(--text-muted)]">{objective.progress_pct}% complete</span>
               </div>
-              <div className="h-2 bg-[rgba(22,26,34,0.07)] rounded-full overflow-hidden">
+              <div className="h-2 bg-[var(--track)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-[#6177ff] to-[#4459e8] rounded-full"
                   style={{ width: `${objective.progress_pct}%` }}
@@ -566,7 +566,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
                     {dept.done}/{dept.total} done
                   </span>
                 </div>
-                <div className="h-2 bg-[rgba(22,26,34,0.07)] rounded-full overflow-hidden">
+              <div className="h-2 bg-[var(--track)] rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
                       dept.percentage === 100

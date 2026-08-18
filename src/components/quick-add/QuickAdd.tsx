@@ -96,7 +96,7 @@ export function QuickAdd({ open, onClose }: QuickAddProps) {
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
                 tab === t.id
                   ? 'bg-[var(--brand-soft)] text-[var(--brand)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]'
-                  : 'text-[var(--text-muted)] hover:bg-[rgba(22,26,34,0.05)] hover:text-[var(--text-primary)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--hover)] hover:text-[var(--text-primary)]'
               }`}
             >
               <t.icon size={14} /> {t.label}

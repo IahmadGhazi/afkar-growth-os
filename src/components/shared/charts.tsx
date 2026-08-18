@@ -127,12 +127,12 @@ export function TrendChart({
       </defs>
 
       {/* gridlines + labels */}
-      <line x1={padL} y1={y(max)} x2={padL + innerW} y2={y(max)} stroke="rgba(22,26,34,0.07)" strokeDasharray="3 4" />
-      <text x={padL + innerW + 6} y={y(max) + 3.5} fontSize="9.5" fill="#969eab">
+      <line x1={padL} y1={y(max)} x2={padL + innerW} y2={y(max)} stroke="var(--hairline)" strokeDasharray="3 4" />
+      <text x={padL + innerW + 6} y={y(max) + 3.5} fontSize="9.5" fill="var(--text-muted)">
         {maxLabel}
       </text>
-      <line x1={padL} y1={y(min)} x2={padL + innerW} y2={y(min)} stroke="rgba(22,26,34,0.05)" strokeDasharray="3 4" />
-      <text x={padL + innerW + 6} y={y(min) + 3.5} fontSize="9.5" fill="#969eab">
+      <line x1={padL} y1={y(min)} x2={padL + innerW} y2={y(min)} stroke="var(--hairline)" strokeDasharray="3 4" />
+      <text x={padL + innerW + 6} y={y(min) + 3.5} fontSize="9.5" fill="var(--text-muted)">
         {minLabel}
       </text>
 
@@ -184,17 +184,17 @@ export function TrendChart({
             cy={y(data[data.length - 1].value)}
             r="3"
             fill={color}
-            stroke="#fff"
+            stroke="var(--surface-solid)"
             strokeWidth="1.5"
           />
         </>
       )}
 
       {/* x labels */}
-      <text x={padL} y={H - 4} fontSize="9.5" fill="#969eab">
+      <text x={padL} y={H - 4} fontSize="9.5" fill="var(--text-muted)">
         {formatShort(data[0].date)}
       </text>
-      <text x={padL + innerW} y={H - 4} fontSize="9.5" fill="#969eab" textAnchor="end">
+      <text x={padL + innerW} y={H - 4} fontSize="9.5" fill="var(--text-muted)" textAnchor="end">
         {formatShort(data[data.length - 1].date)}
       </text>
     </svg>
