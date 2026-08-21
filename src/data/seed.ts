@@ -1,5 +1,7 @@
 import type {
   ActivityLog,
+  Campaign,
+  CampaignMetric,
   ChatMessage,
   Client,
   ClientAssignment,
@@ -13,6 +15,7 @@ import type {
   Profile,
   SyncRun,
   Task,
+  TaskComment,
   WeeklyObjective,
   KeyResult,
 } from '../types/database'
@@ -35,6 +38,9 @@ export interface AppState {
   activity: ActivityLog[]
   messages: ChatMessage[]
   products: ProductCandidate[]
+  campaigns: Campaign[]
+  campaignMetrics: CampaignMetric[]
+  taskComments: TaskComment[]
   currentUserId: string | null
   currentClientId: string | null
   /** False until the first backend bootstrap resolves; the shell shows a

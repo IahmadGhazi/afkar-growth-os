@@ -9,6 +9,7 @@ import {
   FileText,
   MessageSquare,
   Package,
+  Megaphone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useApp } from '@/lib/store'
@@ -27,6 +28,7 @@ const navigation = [
   { name: 'Team', path: '/team', icon: Users },
   { name: 'Team Chat', path: '/chat', icon: MessageSquare },
   { name: 'Products', path: '/products', icon: Package },
+  { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
   { name: 'KPIs', path: '/kpis', icon: BarChart3 },
   { name: 'Data & Sources', path: '/data', icon: Database },
 ]

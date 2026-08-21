@@ -221,6 +221,46 @@ create table if not exists public.product_candidates (
   updated_at timestamptz not null default now()
 );
 
+-- ---------- CAMPAIGNS ----------
+create table if not exists public.campaigns (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  name text not null,
+  platform text not null default 'other' check (platform in ('google_ads','tiktok_ads','snap_ads','salla','other')),
+  status text not null default 'planned' check (status in ('planned','active','paused','completed','archived')),
+  budget numeric,
+  objective text,
+  start_date date,
+  end_date date,
+  created_by text references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ---------- CAMPAIGN METRICS (the media buyer's daily log) ----------
+create table if not exists public.campaign_metrics (
+  id text primary key,
+  campaign_id text not null references public.campaigns(id) on delete cascade,
+  client_id text not null references public.clients(id) on delete cascade,
+  date date not null,
+  impressions integer not null default 0,
+  clicks integer not null default 0,
+  spend numeric not null default 0,
+  purchases integer not null default 0,
+  revenue numeric not null default 0,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+-- ---------- TASK COMMENTS (the handoff conversation) ----------
+create table if not exists public.task_comments (
+  id text primary key,
+  task_id text not null references public.tasks(id) on delete cascade,
+  user_id text not null references public.profiles(id) on delete cascade,
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- CONNECTIONS ----------
 create table if not exists public.connections (
   id text primary key,
@@ -267,6 +307,9 @@ alter table public.notifications enable row level security;
 alter table public.activity_logs enable row level security;
 alter table public.messages enable row level security;
 alter table public.product_candidates enable row level security;
+alter table public.campaigns enable row level security;
+alter table public.campaign_metrics enable row level security;
+alter table public.task_comments enable row level security;
 alter table public.connections enable row level security;
 alter table public.sync_runs enable row level security;
 
@@ -285,6 +328,9 @@ do $$ begin
   create policy "anon full access activity_logs" on public.activity_logs for all to anon using (true) with check (true);
   create policy "anon full access messages" on public.messages for all to anon using (true) with check (true);
   create policy "anon full access product_candidates" on public.product_candidates for all to anon using (true) with check (true);
+  create policy "anon full access campaigns" on public.campaigns for all to anon using (true) with check (true);
+  create policy "anon full access campaign_metrics" on public.campaign_metrics for all to anon using (true) with check (true);
+  create policy "anon full access task_comments" on public.task_comments for all to anon using (true) with check (true);
   create policy "anon full access connections" on public.connections for all to anon using (true) with check (true);
   create policy "anon full access sync_runs" on public.sync_runs for all to anon using (true) with check (true);
 exception when duplicate_object then null; end $$;
@@ -520,13 +566,25 @@ insert into public.messages (id, client_id, author_id, body, created_at) values
   ('msg_4', 'cli_afkar', 'usr_ali', 'Cart abandonment retargeting campaign is running. ROAS holding above 12 so far.', now() - interval '3 hours')
 on conflict (id) do nothing;
 
--- Product research seed (the funnel in motion)
-insert into public.product_candidates (id, client_id, name, category, source_url, competitor, estimated_price, demand_evidence, notes, score_demand, score_competition, score_margin, score_creative, score_brand_fit, score_trend, status, decision_notes, researcher_id, created_at, updated_at) values
+-- Product research seed (the funnel in motion)insert into public.product_candidates (id, client_id, name, category, source_url, competitor, estimated_price, demand_evidence, notes, score_demand, score_competition, score_margin, score_creative, score_brand_fit, score_trend, status, decision_notes, researcher_id, created_at, updated_at) values
   ('prod_1', 'cli_afkar', 'Abstract Gold Canvas 3-Piece Set', 'Living Room', 'https://competitor.com/gold-canvas', 'Competitor A', 449, '1.2k reviews, restocked 3x this quarter', 'Strong margin at supplier price', 9, 6, 8, 8, 9, 7, 'shortlisted', null, 'usr_mohammed', now() - interval '5 days', now() - interval '5 days'),
   ('prod_2', 'cli_afkar', 'Neon Islamic Calligraphy Frame', 'Bedroom', 'https://competitor.com/neon-calligraphy', 'Competitor B', 299, 'Trending on TikTok #homedecor KSA', null, 8, 7, 7, 9, 8, 9, 'testing', 'Ad test started, 3 creatives live', 'usr_mohammed', now() - interval '4 days', now() - interval '1 day'),
   ('prod_3', 'cli_afkar', 'Majlis Floor Cushion Set', 'Majlis', 'https://competitor.com/majlis-cushions', 'Competitor C', 899, 'Ramadan seasonal spike expected', null, 7, 8, 6, 6, 9, 5, 'discovered', null, 'usr_mohammed', now() - interval '2 days', now() - interval '2 days'),
   ('prod_4', 'cli_afkar', 'Minimalist Line-Art Diptych', 'Office', null, 'Competitor D', 199, 'Low engagement on competitor listings', 'Weak differentiation, likely kill', 4, 8, 5, 4, 5, 4, 'killed', 'Demand evidence insufficient', 'usr_mohammed', now() - interval '6 days', now() - interval '3 days'),
   ('prod_5', 'cli_afkar', '3D Wooden World Map XL', 'Living Room', 'https://competitor.com/world-map-3d', 'Competitor E', 1299, 'Highest AOV product at two competitors', 'Premium hero candidate for National Day bundle', 10, 5, 9, 9, 10, 8, 'winner', 'Scaled: 34 sales first week, ROAS 11.2', 'usr_mohammed', now() - interval '12 days', now() - interval '2 days')
+on conflict (id) do nothing;
+
+-- Campaigns + a few days of real-shaped metrics
+insert into public.campaigns (id, client_id, name, platform, status, budget, objective, start_date, created_by) values
+  ('camp_1', 'cli_afkar', 'Cart Abandonment Retargeting', 'snap_ads', 'active', 30000, 'Reclaim 10% of the 70k abandoned carts', (now() - interval '10 days')::date, 'usr_ali'),
+  ('camp_2', 'cli_afkar', 'National Day Winners Scaling', 'google_ads', 'active', 40000, 'Scale the winning wall-art products', (now() - interval '5 days')::date, 'usr_ali'),
+  ('camp_3', 'cli_afkar', 'Majlis Collection Teaser', 'tiktok_ads', 'planned', 15000, 'Warm up the audience before launch', ((now() + interval '7 days'))::date, 'usr_ali')
+on conflict (id) do nothing;
+
+insert into public.campaign_metrics (id, campaign_id, client_id, date, impressions, clicks, spend, purchases, revenue) values
+  ('cm_1a', 'camp_1', 'cli_afkar', (now() - interval '2 days')::date, 41200, 980, 1450, 38, 31200),
+  ('cm_1b', 'camp_1', 'cli_afkar', (now() - interval '1 day')::date, 44800, 1120, 1520, 44, 38600),
+  ('cm_2a', 'camp_2', 'cli_afkar', (now() - interval '1 day')::date, 22400, 640, 1180, 21, 52400)
 on conflict (id) do nothing;
 
 -- Snapshot integrity: one value per KPI per day. Dedupe keeping the newest
@@ -541,4 +599,29 @@ exception when others then null; end $$;
 
 do $$ begin
   execute 'create unique index if not exists kpi_snapshots_unique_day on public.kpi_snapshots (kpi_id, snapshot_date)';
+exception when others then null; end $$;
+
+-- One metric row per campaign per day.
+do $$ begin
+  execute 'create unique index if not exists campaign_metrics_unique_day on public.campaign_metrics (campaign_id, date)';
+exception when others then null; end $$;
+
+-- ============================================================
+-- REALTIME: live sync across devices. Idempotent (re-adding a
+-- table to the publication raises 42710 - swallowed here).
+-- ============================================================
+do $$ begin
+  alter publication supabase_realtime add table public.messages;
+exception when others then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.tasks;
+exception when others then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.product_candidates;
+exception when others then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.kpi_snapshots;
+exception when others then null; end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.task_comments;
 exception when others then null; end $$;

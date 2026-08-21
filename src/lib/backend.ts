@@ -1,6 +1,8 @@
 import { supabase, hasSupabaseEnv } from './supabase'
 import type {
   ActivityLog,
+  Campaign,
+  CampaignMetric,
   ChatMessage,
   Client,
   ClientAssignment,
@@ -14,6 +16,7 @@ import type {
   Profile,
   SyncRun,
   Task,
+  TaskComment,
   WeeklyObjective,
   KeyResult,
 } from '../types/database'
@@ -62,7 +65,7 @@ export const backend = {
   available: backendAvailable,
 
   async loadAll() {
-    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages, products] =
+    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages, products, campaigns, campaignMetrics, taskComments] =
       await Promise.all([
         selectAllSafe<Organization>('organizations'),
         selectAllSafe<Client>('clients'),
@@ -80,6 +83,9 @@ export const backend = {
         selectAllSafe<ActivityLog>('activity_logs'),
         selectAllSafe<ChatMessage>('messages', 'created_at'),
         selectAllSafe<ProductCandidate>('product_candidates'),
+        selectAllSafe<Campaign>('campaigns'),
+        selectAllSafe<CampaignMetric>('campaign_metrics', 'date'),
+        selectAllSafe<TaskComment>('task_comments', 'created_at'),
       ])
     return {
       organization: organization[0] ?? null,
@@ -98,6 +104,9 @@ export const backend = {
       activity,
       messages,
       products,
+      campaigns,
+      campaignMetrics,
+      taskComments,
     }
   },
 
@@ -151,4 +160,12 @@ export const backend = {
   insertProduct: (row: ProductCandidate) => upsert('product_candidates', row),
   updateProduct: (id: string, patch: Record<string, unknown>) => updateById('product_candidates', id, patch),
   deleteProduct: (id: string) => remove('product_candidates', id),
+
+  insertCampaign: (row: Campaign) => upsert('campaigns', row),
+  updateCampaign: (id: string, patch: Record<string, unknown>) => updateById('campaigns', id, patch),
+  deleteCampaign: (id: string) => remove('campaigns', id),
+
+  insertMetric: (row: CampaignMetric) => upsert('campaign_metrics', row),
+
+  insertComment: (row: TaskComment) => upsert('task_comments', row),
 }

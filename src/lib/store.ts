@@ -19,10 +19,15 @@ import type {
   ChatMessage,
   ProductCandidate,
   ProductStatus,
+  Campaign,
+  CampaignMetric,
+  CampaignPlatform,
+  TaskComment,
 } from '../types/database'
 import type { AppState } from '../data/seed'
 import { todayISO } from './date'
 import { backend as rawBackend } from './backend'
+import { supabase } from './supabase'
 import { toast } from './toast'
 
 type Listener = () => void
@@ -54,6 +59,9 @@ function emptyState(): AppState {
     activity: [],
     messages: [],
     products: [],
+    campaigns: [],
+    campaignMetrics: [],
+    taskComments: [],
     currentUserId: null,
     currentClientId: null,
     ready: false,
@@ -134,6 +142,9 @@ async function refreshFromServer() {
       activity: data.activity,
       messages: data.messages,
       products: data.products,
+      campaigns: data.campaigns,
+      campaignMetrics: data.campaignMetrics,
+      taskComments: data.taskComments,
     }))
   } catch (err) {
     console.error('Refresh failed:', err)
@@ -170,6 +181,9 @@ async function bootstrap() {
         activity: data.activity,
         messages: data.messages,
         products: data.products,
+        campaigns: data.campaigns,
+        campaignMetrics: data.campaignMetrics,
+        taskComments: data.taskComments,
       }
       // Derive the current user from the backend (no login yet): first active
       // admin/super_admin profile, else the first active profile.
@@ -821,6 +835,106 @@ export const actions = {
     backend.deleteProduct(id).catch(() => undefined)
   },
 
+  addCampaign(input: {
+    name: string
+    platform: CampaignPlatform
+    budget: number | null
+    objective: string | null
+    startDate: string | null
+  }) {
+    set((s) => {
+      const clientId = s.currentClientId
+      if (!clientId) return s
+      const campaign: Campaign = {
+        id: uid('camp'),
+        client_id: clientId,
+        name: input.name,
+        platform: input.platform,
+        status: 'planned',
+        budget: input.budget,
+        objective: input.objective,
+        start_date: input.startDate,
+        end_date: null,
+        created_by: s.currentUserId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      backend.insertCampaign(campaign).catch(() => undefined)
+      return { ...s, campaigns: [...s.campaigns, campaign] }
+    })
+    toast.success('Campaign created.')
+  },
+
+  updateCampaign(id: string, patch: Partial<Campaign>) {
+    set((s) => ({
+      ...s,
+      campaigns: s.campaigns.map((c) =>
+        c.id === id ? { ...c, ...patch, updated_at: new Date().toISOString() } : c,
+      ),
+    }))
+    backend.updateCampaign(id, { ...patch, updated_at: new Date().toISOString() }).catch(() => undefined)
+  },
+
+  deleteCampaign(id: string) {
+    set((s) => ({
+      ...s,
+      campaigns: s.campaigns.filter((c) => c.id !== id),
+      campaignMetrics: s.campaignMetrics.filter((m) => m.campaign_id !== id),
+    }))
+    backend.deleteCampaign(id).catch(() => undefined)
+  },
+
+  /** The media buyer's daily log. Deterministic id = one row per campaign
+      per day; re-saving today's numbers overwrites instead of duplicating. */
+  logMetric(input: {
+    campaignId: string
+    date: string
+    impressions: number
+    clicks: number
+    spend: number
+    purchases: number
+    revenue: number
+    notes?: string | null
+  }) {
+    set((s) => {
+      const clientId = s.currentClientId
+      if (!clientId) return s
+      const metric: CampaignMetric = {
+        id: `cm_${input.campaignId}_${input.date}`,
+        campaign_id: input.campaignId,
+        client_id: clientId,
+        date: input.date,
+        impressions: input.impressions,
+        clicks: input.clicks,
+        spend: input.spend,
+        purchases: input.purchases,
+        revenue: input.revenue,
+        notes: input.notes ?? null,
+        created_at: new Date().toISOString(),
+      }
+      backend.insertMetric(metric).catch(() => undefined)
+      const rest = s.campaignMetrics.filter((m) => m.id !== metric.id)
+      return { ...s, campaignMetrics: [...rest, metric] }
+    })
+    toast.success('Numbers logged.')
+  },
+
+  addComment(taskId: string, content: string) {
+    set((s) => {
+      const authorId = s.currentUserId
+      if (!authorId || !content.trim()) return s
+      const comment: TaskComment = {
+        id: uid('tcm'),
+        task_id: taskId,
+        user_id: authorId,
+        content: content.trim(),
+        created_at: new Date().toISOString(),
+      }
+      backend.insertComment(comment).catch(() => undefined)
+      return { ...s, taskComments: [...s.taskComments, comment] }
+    })
+  },
+
   resetAll() {
     set(() => emptyState())
   },
@@ -845,4 +959,25 @@ function getState() {
 
 export function initStore() {
   bootstrap()
+  startLiveSync()
+}
+
+/** LIVE SYNC. Supabase Realtime pushes INSERT/UPDATE/DELETE on the tables
+    in the supabase_realtime publication; we debounce one server re-pull so
+    every open device converges without a manual refresh. If the publication
+    is not set up yet (schema not re-run) this simply never fires - graceful. */
+function startLiveSync() {
+  if (!supabase) return
+  const channel = supabase.channel('afkar-live-sync')
+  for (const table of ['messages', 'tasks', 'product_candidates', 'kpi_snapshots', 'task_comments', 'campaigns', 'campaign_metrics']) {
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table },
+      () => {
+        if (refreshTimer) clearTimeout(refreshTimer)
+        refreshTimer = setTimeout(() => refreshFromServer(), 700)
+      },
+    )
+  }
+  channel.subscribe()
 }

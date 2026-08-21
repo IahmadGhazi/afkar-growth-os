@@ -13,6 +13,7 @@ import { WeeklyPlan } from './features/objectives/WeeklyPlan'
 import { Team } from './features/team/Team'
 import { Chat } from './features/chat/Chat'
 import { Products } from './features/products/Products'
+import { Campaigns } from './features/campaigns/Campaigns'
 import { Kpis } from './features/kpis/Kpis'
 import { Data } from './features/data/Data'
 import { Settings } from './features/settings/Settings'
@@ -27,6 +28,7 @@ const pageTitles: Record<string, string> = {
   '/team': 'Team',
   '/chat': 'Team Chat',
   '/products': 'Product Research',
+  '/campaigns': 'Campaigns',
   '/kpis': 'KPIs',
   '/data': 'Data & Sources',
   '/report': 'Client Report',
@@ -74,6 +76,8 @@ function App() {
         return <Chat />
       case '/products':
         return <Products />
+      case '/campaigns':
+        return <Campaigns />
       case '/kpis':
         return <Kpis />
       case '/data':

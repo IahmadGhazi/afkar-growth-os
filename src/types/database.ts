@@ -198,6 +198,46 @@ export type ProductStatus =
   | 'scaled'
   | 'killed'
 
+export type CampaignPlatform = 'google_ads' | 'tiktok_ads' | 'snap_ads' | 'salla' | 'other'
+
+export interface Campaign {
+  id: string
+  client_id: string
+  name: string
+  platform: CampaignPlatform
+  status: 'planned' | 'active' | 'paused' | 'completed' | 'archived'
+  budget: number | null
+  objective: string | null
+  start_date: string | null
+  end_date: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** One row per campaign per day — the media buyer's daily log. */
+export interface CampaignMetric {
+  id: string
+  campaign_id: string
+  client_id: string
+  date: string
+  impressions: number
+  clicks: number
+  spend: number
+  purchases: number
+  revenue: number
+  notes: string | null
+  created_at: string
+}
+
+export interface TaskComment {
+  id: string
+  task_id: string
+  user_id: string
+  content: string
+  created_at: string
+}
+
 /** The research funnel: many discovered, few win. Scores are 0-10 per
     dimension; score_total is the mean of the ones the researcher filled. */
 export interface ProductCandidate {
