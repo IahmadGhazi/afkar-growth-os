@@ -7,11 +7,14 @@ import {
   Check,
   Pencil,
   X,
+  UserRound,
+  LogOut,
 } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { currentClient, getConnection } from '../../lib/selectors'
 import { SOURCES } from '../../lib/integrations'
 import { backendAvailable } from '../../lib/backend'
+import { signOut, useAuth } from '../../lib/auth'
 
 function Toggle({
   checked,
@@ -43,10 +46,15 @@ function Toggle({
 
 export function Settings() {
   const { state, actions } = useApp()
+  const auth = useAuth()
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(state.organization.name)
 
   const client = currentClient(state)
+
+  const handleSignOut = () => {
+    void signOut()
+  }
 
   const saveName = () => {
     if (!name.trim()) return
@@ -228,6 +236,20 @@ export function Settings() {
               />
             </div>
           </div>
+        </div>
+
+        {/* Account */}
+        <div className="glass-card p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <UserRound size={20} className="text-[var(--brand)]" />
+            <div>
+              <div className="font-medium text-[var(--text-primary)]">Account</div>
+              <div className="text-sm text-[var(--text-muted)]">Signed in as {auth.email ?? 'team member'}</div>
+            </div>
+          </div>
+          <button onClick={handleSignOut} className="btn btn-outline">
+            <LogOut size={15} /> Sign out
+          </button>
         </div>
 
         {/* Backend */}

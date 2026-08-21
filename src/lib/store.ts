@@ -161,6 +161,10 @@ async function bootstrap() {
       set((s) => ({ ...s, organization: emptyState().organization, ready: true }))
       return
     }
+    // Who is signed in? The profile linked to this auth user becomes the
+    // current user; self-heal the link when the trigger has not run yet.
+    const { data: userData } = await supabase!.auth.getUser()
+    const authUser = userData?.user ?? null
     const data = await backend.loadAll()
     set((s) => {
       const next = {
@@ -185,19 +189,20 @@ async function bootstrap() {
         campaignMetrics: data.campaignMetrics,
         taskComments: data.taskComments,
       }
-      // Derive the current user from the backend (no login yet): first active
-      // admin/super_admin profile, else the first active profile.
-      const admins = next.profiles.filter(
-        (p) => p.is_active && (p.role === 'super_admin' || p.role === 'account_manager'),
-      )
-      const fallback = next.profiles.find((p) => p.is_active)
-      const user = admins[0] ?? fallback ?? null
-      const client = next.clients[0] ?? null
-      return {
-        ...next,
-        currentUserId: user?.id ?? null,
-        currentClientId: client?.id ?? null,
+      let currentUserId: string | null = null
+      if (authUser) {
+        const mine =
+          next.profiles.find((p) => p.auth_user_id === authUser.id) ??
+          next.profiles.find(
+            (p) => p.email.toLowerCase() === (authUser.email ?? '').toLowerCase(),
+          )
+        currentUserId = mine?.id ?? null
+        // Self-heal: write the link the trigger would have made.
+        if (mine && !mine.auth_user_id) {
+          backend.updateProfile(mine.id, { auth_user_id: authUser.id }).catch(() => undefined)
+        }
       }
+      return { ...next, currentUserId }
     })
   } catch (err) {
     console.error('bootstrap failed', err)
@@ -960,6 +965,14 @@ function getState() {
 export function initStore() {
   bootstrap()
   startLiveSync()
+}
+
+/** Sign-out: wipe to a clean signed-out state so a stale workspace never
+    lingers on screen; the next sign-in re-bootstraps from scratch. */
+export function resetForSignOut() {
+  bootstrapped = false
+  state = { ...emptyState(), ready: true }
+  notify()
 }
 
 /** LIVE SYNC. Supabase Realtime pushes INSERT/UPDATE/DELETE on the tables

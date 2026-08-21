@@ -6,6 +6,8 @@ import { QuickAdd } from './components/quick-add/QuickAdd'
 import { BootScreen } from './components/shared/BootScreen'
 import { Toaster } from './lib/toast'
 import { useApp } from './lib/store'
+import { useAuth } from './lib/auth'
+import { Login } from './features/auth/Login'
 import { CommandCenter } from './features/command-center/CommandCenter'
 import { MyWork } from './features/my-work/MyWork'
 import { Tasks } from './features/tasks/Tasks'
@@ -37,6 +39,7 @@ const pageTitles: Record<string, string> = {
 
 function App() {
   const { state } = useApp()
+  const auth = useAuth()
   const [currentPath, setCurrentPath] = useState('/')
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -93,8 +96,10 @@ function App() {
 
   return (
     <div className="min-h-screen lg:flex lg:h-screen lg:overflow-hidden">
-      {!state.ready && <BootScreen />}
-      {state.ready && (
+      {auth.status === 'loading' && <BootScreen />}
+      {auth.status === 'signed-out' && <Login />}
+      {auth.status === 'signed-in' && !state.ready && <BootScreen />}
+      {auth.status === 'signed-in' && state.ready && (
         <>
           {/* Desktop sidebar */}
       <div className="hidden lg:block shrink-0">

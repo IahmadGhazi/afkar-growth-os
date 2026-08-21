@@ -60,6 +60,26 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- LOGIN LINK: bridges Supabase Auth (uuid ids) to our text-id profiles.
+-- Additive per the alter-table rule; never breaks existing rows.
+alter table public.profiles add column if not exists auth_user_id uuid references auth.users(id) on delete set null;
+
+-- When the owner creates an auth user whose email matches a profile,
+-- the link happens itself. SECURITY DEFINER so the trigger may update
+-- profiles without depending on who inserted the auth row.
+create or replace function public.link_profile_to_auth_user() returns trigger as $$
+begin
+  update public.profiles
+    set auth_user_id = new.id, updated_at = now()
+    where auth_user_id is null and lower(email) = lower(new.email);
+  return new;
+end $$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created_link_profile on auth.users;
+create trigger on_auth_user_created_link_profile
+  after insert on auth.users
+  for each row execute function public.link_profile_to_auth_user();
+
 -- ---------- CLIENT ASSIGNMENTS ----------
 create table if not exists public.client_assignments (
   id text primary key,
@@ -314,61 +334,155 @@ alter table public.connections enable row level security;
 alter table public.sync_runs enable row level security;
 
 do $$ begin
-  create policy "anon full access organizations" on public.organizations for all to anon using (true) with check (true);
-exception when duplicate_object then null; when others then null; end $$;
+  drop policy if exists "anon full access organizations" on public.organizations;
+exception when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access clients" on public.clients for all to anon using (true) with check (true);
+  create policy "team full access organizations" on public.organizations for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access profiles" on public.profiles for all to anon using (true) with check (true);
+  drop policy if exists "anon full access clients" on public.clients;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access clients" on public.clients for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access client_assignments" on public.client_assignments for all to anon using (true) with check (true);
+  drop policy if exists "anon full access profiles" on public.profiles;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access profiles" on public.profiles for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access tasks" on public.tasks for all to anon using (true) with check (true);
+  drop policy if exists "anon full access client_assignments" on public.client_assignments;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access client_assignments" on public.client_assignments for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access weekly_objectives" on public.weekly_objectives for all to anon using (true) with check (true);
+  drop policy if exists "anon full access tasks" on public.tasks;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access tasks" on public.tasks for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access key_results" on public.key_results for all to anon using (true) with check (true);
+  drop policy if exists "anon full access weekly_objectives" on public.weekly_objectives;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access weekly_objectives" on public.weekly_objectives for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access kpi_definitions" on public.kpi_definitions for all to anon using (true) with check (true);
+  drop policy if exists "anon full access key_results" on public.key_results;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access key_results" on public.key_results for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access kpi_snapshots" on public.kpi_snapshots for all to anon using (true) with check (true);
+  drop policy if exists "anon full access kpi_definitions" on public.kpi_definitions;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access kpi_definitions" on public.kpi_definitions for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access kpi_targets" on public.kpi_targets for all to anon using (true) with check (true);
+  drop policy if exists "anon full access kpi_snapshots" on public.kpi_snapshots;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access kpi_snapshots" on public.kpi_snapshots for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access notifications" on public.notifications for all to anon using (true) with check (true);
+  drop policy if exists "anon full access kpi_targets" on public.kpi_targets;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access kpi_targets" on public.kpi_targets for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access activity_logs" on public.activity_logs for all to anon using (true) with check (true);
+  drop policy if exists "anon full access notifications" on public.notifications;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access notifications" on public.notifications for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access messages" on public.messages for all to anon using (true) with check (true);
+  drop policy if exists "anon full access activity_logs" on public.activity_logs;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access activity_logs" on public.activity_logs for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access product_candidates" on public.product_candidates for all to anon using (true) with check (true);
+  drop policy if exists "anon full access messages" on public.messages;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access messages" on public.messages for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access campaigns" on public.campaigns for all to anon using (true) with check (true);
+  drop policy if exists "anon full access product_candidates" on public.product_candidates;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access product_candidates" on public.product_candidates for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access campaign_metrics" on public.campaign_metrics for all to anon using (true) with check (true);
+  drop policy if exists "anon full access campaigns" on public.campaigns;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access campaigns" on public.campaigns for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access task_comments" on public.task_comments for all to anon using (true) with check (true);
+  drop policy if exists "anon full access campaign_metrics" on public.campaign_metrics;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access campaign_metrics" on public.campaign_metrics for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access connections" on public.connections for all to anon using (true) with check (true);
+  drop policy if exists "anon full access task_comments" on public.task_comments;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access task_comments" on public.task_comments for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
+
 do $$ begin
-  create policy "anon full access sync_runs" on public.sync_runs for all to anon using (true) with check (true);
+  drop policy if exists "anon full access connections" on public.connections;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access connections" on public.connections for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+
+do $$ begin
+  drop policy if exists "anon full access sync_runs" on public.sync_runs;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access sync_runs" on public.sync_runs for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
 
 -- ============================================================
@@ -596,7 +710,7 @@ on conflict (id) do nothing;
 
 -- Chat messages (a few to start the conversation)
 insert into public.messages (id, client_id, author_id, body, created_at) values
-  ('msg_1', 'cli_afkar', 'usr_omar', 'Welcome everyone 👋 Let\u2019s keep all updates and handoffs here so nothing gets lost in WhatsApp.', now() - interval '2 days'),
+  ('msg_1', 'cli_afkar', 'usr_omar', 'Welcome everyone - let\u2019s keep all updates and handoffs here so nothing gets lost in WhatsApp.', now() - interval '2 days'),
   ('msg_2', 'cli_afkar', 'usr_ahmad', 'Perfect \u2014 I\u2019ll post the National Day banner files here once approved.', now() - interval '2 days' + interval '1 hour'),
   ('msg_3', 'cli_afkar', 'usr_sara', 'SEO landing page is live: /national-day-offers. Internal links added to menu + footer.', now() - interval '1 day'),
   ('msg_4', 'cli_afkar', 'usr_ali', 'Cart abandonment retargeting campaign is running. ROAS holding above 12 so far.', now() - interval '3 hours')

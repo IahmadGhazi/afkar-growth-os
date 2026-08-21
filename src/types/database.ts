@@ -60,6 +60,8 @@ export interface Profile {
   avatar_url: string | null
   role: UserRole
   is_active: boolean
+  /** Supabase Auth user this profile belongs to (linked by email on signup). */
+  auth_user_id?: string | null
   created_at: string
   updated_at: string
 }
