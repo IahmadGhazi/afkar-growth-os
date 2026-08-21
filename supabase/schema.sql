@@ -315,25 +315,61 @@ alter table public.sync_runs enable row level security;
 
 do $$ begin
   create policy "anon full access organizations" on public.organizations for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access clients" on public.clients for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access profiles" on public.profiles for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access client_assignments" on public.client_assignments for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access tasks" on public.tasks for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access weekly_objectives" on public.weekly_objectives for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access key_results" on public.key_results for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access kpi_definitions" on public.kpi_definitions for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access kpi_snapshots" on public.kpi_snapshots for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access kpi_targets" on public.kpi_targets for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access notifications" on public.notifications for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access activity_logs" on public.activity_logs for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access messages" on public.messages for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access product_candidates" on public.product_candidates for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access campaigns" on public.campaigns for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access campaign_metrics" on public.campaign_metrics for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access task_comments" on public.task_comments for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access connections" on public.connections for all to anon using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
   create policy "anon full access sync_runs" on public.sync_runs for all to anon using (true) with check (true);
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; when others then null; end $$;
 
 -- ============================================================
 -- SEED DATA
