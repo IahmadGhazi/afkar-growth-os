@@ -178,11 +178,11 @@ export function Tasks() {
       )}
 
       {/* Kanban Board */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
         {statusColumns.map((column) => {
           const columnTasks = filteredTasks.filter((t) => t.status === column.status)
           return (
-            <div key={column.status} className="flex-shrink-0 w-72">
+            <div key={column.status} className="flex-shrink-0 w-72 snap-start">
               <div className="flex items-center gap-2 mb-3 px-1">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: column.color }} />
                 <span className="text-sm font-semibold text-[var(--text-primary)]">

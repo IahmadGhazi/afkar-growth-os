@@ -183,40 +183,111 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
         </div>
       </section>
 
-      {/* Business Performance */}
-      <section>
-        <SectionTitle>Business Performance</SectionTitle>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {statCards.map((stat) => (
-            <div key={stat.name} className="glass-card hover-lift p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm text-[var(--text-muted)] font-medium truncate">{stat.name}</div>
-                  <div className="text-2xl font-bold text-[var(--text-primary)] mt-1.5">
-                    {stat.value}
+      {/* Hero metrics — the two numbers the whole business hangs on */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {['Revenue', 'ROAS'].map((heroName) => {
+          const kpi = kpis.find((k) => k.name === heroName)
+          if (!kpi) return null
+          const format = unitFormats[kpi.unit ?? 'count']
+          const change = kpi.previous != null ? changePct(kpi.current, kpi.previous) : null
+          const changeNum = change ? parseFloat(change) : 0
+          const isUp = changeNum >= 0
+          const invert = kpi.direction === 'lower_better'
+          const good = change == null ? true : invert ? !isUp : isUp
+          return (
+            <div key={heroName} className="glass-card hover-lift p-6 md:col-span-1">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm font-medium text-[var(--text-muted)]">{kpi.name}</div>
+                  <div className="text-4xl font-extrabold tracking-tight text-[var(--text-primary)] mt-2">
+                    {format(kpi.current)}
                   </div>
-                  <div className={`flex items-center gap-1 mt-2.5 text-sm ${
-                    stat.change ? (stat.good ? 'text-[var(--positive)]' : 'text-[var(--critical)]') : 'text-[var(--text-muted)]'
+                  <div className={`flex items-center gap-1 mt-3 text-sm font-medium ${
+                    change ? (good ? 'text-[var(--positive)]' : 'text-[var(--critical)]') : 'text-[var(--text-muted)]'
                   }`}>
-                    {stat.change ? (
+                    {change ? (
                       <>
-                        {stat.change.startsWith('-') ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
-                        {stat.change} vs last week
+                        {change.startsWith('-') ? <TrendingDown size={15} /> : <TrendingUp size={15} />}
+                        {change} vs last week
                       </>
-                    ) : (
-                      <span>No history yet</span>
-                    )}
+                    ) : 'No history yet'}
                   </div>
                 </div>
-                <div className="w-[120px] shrink-0">
+                <div className="w-[110px] shrink-0 self-end">
                   <Sparkline
-                    data={stat.series.map((d) => d.value)}
-                    color={stat.good ? '#19b87a' : stat.change ? '#dd5a5a' : '#d29a0c'}
+                    data={kpiSeriesFor(state, kpi.id, clientId).map((d) => d.value)}
+                    color={kpi.unit === 'ratio' ? '#f0c42e' : good ? '#19b87a' : '#dd5a5a'}
                   />
                 </div>
               </div>
             </div>
-          ))}
+          )
+        })}
+
+        {/* Growth Score — one number for "how healthy is the machine" */}
+        {(() => {
+          const scored = kpis.filter((k) => !isPlatformKpi(k.name))
+          const points: Record<string, number> = { achieved: 1, on_track: 0.8, at_risk: 0.5, behind: 0.2 }
+          const avg = (list: typeof scored) =>
+            list.length === 0 ? 0 : Math.round((list.reduce((sum, k) => sum + points[k.status], 0) / list.length) * 100)
+          const score = avg(scored)
+          const tone = score >= 80 ? 'var(--positive)' : score >= 60 ? 'var(--brand)' : score >= 40 ? 'var(--warning)' : 'var(--critical)'
+          const depts = Object.keys(DEPARTMENT_LABELS)
+            .map((d) => ({ dept: d, list: scored.filter((k) => k.department === d) }))
+            .filter((g) => g.list.length > 0)
+          return (
+            <div className="glass-card hover-lift p-6 flex flex-col">
+              <div className="flex items-baseline justify-between">
+                <div className="text-sm font-medium text-[var(--text-muted)]">Growth Score</div>
+                <div className="text-4xl font-extrabold tracking-tight" style={{ color: tone }}>
+                  {score}
+                  <span className="text-base font-semibold text-[var(--text-muted)]">/100</span>
+                </div>
+              </div>
+              <div className="mt-auto pt-4 space-y-1.5">
+                {depts.map(({ dept, list }) => {
+                  const s = avg(list)
+                  return (
+                    <div key={dept} className="flex items-center gap-2 text-xs">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: s >= 80 ? 'var(--positive)' : s >= 60 ? 'var(--brand)' : s >= 40 ? 'var(--warning)' : 'var(--critical)' }}
+                      />
+                      <span className="text-[var(--text-secondary)] w-24 truncate">{departmentLabel(dept)}</span>
+                      <div className="flex-1 h-1 rounded-full bg-[var(--track)] overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${s}%`, backgroundColor: s >= 80 ? 'var(--positive)' : s >= 60 ? 'var(--brand)' : s >= 40 ? 'var(--warning)' : 'var(--critical)' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
+      </section>
+
+      {/* Key metrics — everything else, dense and scannable by department */}
+      <section>
+        <SectionTitle>Business Performance</SectionTitle>
+        <div className="glass-card divide-y divide-[var(--hairline)]">
+          {statCards
+            .filter((s) => s.name !== 'Revenue' && s.name !== 'ROAS')
+            .map((stat) => (
+              <div key={stat.name} className="flex items-center gap-4 px-5 py-3.5 hover:bg-[var(--hover)] transition-colors first:rounded-t-[18px] last:rounded-b-[18px]">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-[var(--text-secondary)] truncate">{stat.name}</div>
+                </div>
+                <div className="hidden sm:block w-[90px]">
+                  <Sparkline data={stat.series.map((d) => d.value)} color={stat.good ? '#19b87a' : stat.change ? '#dd5a5a' : '#d29a0c'} width={90} height={26} />
+                </div>
+                <div className="w-28 text-right text-lg font-bold text-[var(--text-primary)] tabular-nums">{stat.value}</div>
+                <div className={`w-20 text-right text-xs font-medium ${
+                  stat.change ? (stat.good ? 'text-[var(--positive)]' : 'text-[var(--critical)]') : 'text-[var(--text-muted)]'
+                }`}>
+                  {stat.change ?? '—'}
+                </div>
+              </div>
+            ))}
         </div>
       </section>
 

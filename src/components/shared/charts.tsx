@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useRef, useState } from 'react'
 import { formatShort } from '../../lib/date'
 
 function safeId(id: string): string {
@@ -65,6 +65,8 @@ export function Sparkline({
   )
 }
 
+/** Interactive trend chart: move across it to read any week's value. The
+    tooltip is the answer to "so what was it in March?" without a library. */
 export function TrendChart({
   data,
   mode = 'area',
@@ -83,6 +85,8 @@ export function TrendChart({
   height?: number
 }) {
   const gid = safeId(useId())
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const boxRef = useRef<HTMLDivElement | null>(null)
   if (data.length < 2) return null
 
   const W = 300
@@ -114,89 +118,142 @@ export function TrendChart({
     .join(' ')
   const areaPath = `${linePath} L${x(data.length - 1).toFixed(1)},${padT + innerH} L${x(0).toFixed(1)},${padT + innerH} Z`
 
-  const maxLabel = formatValue ? formatValue(max) : Math.round(max).toLocaleString()
-  const minLabel = formatValue ? formatValue(min) : Math.round(min).toLocaleString()
+  const fmt = formatValue ?? ((v: number) => Math.round(v).toLocaleString())
+  const maxLabel = fmt(max)
+  const minLabel = fmt(min)
+
+  const onMove = (clientX: number) => {
+    const box = boxRef.current
+    if (!box) return
+    const rect = box.getBoundingClientRect()
+    const scale = rect.width / W
+    const vx = (clientX - rect.left) / scale
+    const idx = Math.round((vx - padL) / stepX)
+    setHoverIdx(Math.max(0, Math.min(data.length - 1, idx)))
+  }
+
+  const hp = hoverIdx != null ? data[hoverIdx] : null
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" className="overflow-visible">
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.26" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
+    <div
+      ref={boxRef}
+      className="relative select-none"
+      onMouseMove={(e) => onMove(e.clientX)}
+      onMouseLeave={() => setHoverIdx(null)}
+      onTouchStart={(e) => onMove(e.touches[0].clientX)}
+      onTouchMove={(e) => onMove(e.touches[0].clientX)}
+      onTouchEnd={() => setHoverIdx(null)}
+    >
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" className="overflow-visible">
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.26" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
 
-      {/* gridlines + labels */}
-      <line x1={padL} y1={y(max)} x2={padL + innerW} y2={y(max)} stroke="var(--hairline)" strokeDasharray="3 4" />
-      <text x={padL + innerW + 6} y={y(max) + 3.5} fontSize="9.5" fill="var(--text-muted)">
-        {maxLabel}
-      </text>
-      <line x1={padL} y1={y(min)} x2={padL + innerW} y2={y(min)} stroke="var(--hairline)" strokeDasharray="3 4" />
-      <text x={padL + innerW + 6} y={y(min) + 3.5} fontSize="9.5" fill="var(--text-muted)">
-        {minLabel}
-      </text>
-
-      {/* target line */}
-      {target != null && (
-        <line
-          x1={padL}
-          y1={y(target)}
-          x2={padL + innerW}
-          y2={y(target)}
-          stroke="#e0902e"
-          strokeWidth="1.25"
-          strokeDasharray="4 4"
-        />
-      )}
-      {target != null && targetLabel && (
-        <text x={padL + innerW + 6} y={y(target) - 3} fontSize="9.5" fill="#e0902e">
-          {targetLabel}
+        {/* gridlines + labels */}
+        <line x1={padL} y1={y(max)} x2={padL + innerW} y2={y(max)} stroke="var(--hairline)" strokeDasharray="3 4" />
+        <text x={padL + innerW + 6} y={y(max) + 3.5} fontSize="9.5" fill="var(--text-muted)">
+          {maxLabel}
         </text>
-      )}
+        <line x1={padL} y1={y(min)} x2={padL + innerW} y2={y(min)} stroke="var(--hairline)" strokeDasharray="3 4" />
+        <text x={padL + innerW + 6} y={y(min) + 3.5} fontSize="9.5" fill="var(--text-muted)">
+          {minLabel}
+        </text>
 
-      {/* series */}
-      {mode === 'bar' ? (
-        data.map((d, i) => (
-          <rect
-            key={i}
-            x={x(i) - barW / 2}
-            y={y(d.value)}
-            width={barW}
-            height={Math.max(1, padT + innerH - y(d.value))}
-            rx={3}
-            fill={color}
-            fillOpacity={0.82}
+        {/* target line */}
+        {target != null && (
+          <line
+            x1={padL}
+            y1={y(target)}
+            x2={padL + innerW}
+            y2={y(target)}
+            stroke="#e0902e"
+            strokeWidth="1.25"
+            strokeDasharray="4 4"
           />
-        ))
-      ) : (
-        <>
-          <path d={areaPath} fill={`url(#${gid})`} />
-          <path
-            d={linePath}
-            fill="none"
-            stroke={color}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <circle
-            cx={x(data.length - 1)}
-            cy={y(data[data.length - 1].value)}
-            r="3"
-            fill={color}
-            stroke="var(--surface-solid)"
-            strokeWidth="1.5"
-          />
-        </>
-      )}
+        )}
+        {target != null && targetLabel && (
+          <text x={padL + innerW + 6} y={y(target) - 3} fontSize="9.5" fill="#e0902e">
+            {targetLabel}
+          </text>
+        )}
 
-      {/* x labels */}
-      <text x={padL} y={H - 4} fontSize="9.5" fill="var(--text-muted)">
-        {formatShort(data[0].date)}
-      </text>
-      <text x={padL + innerW} y={H - 4} fontSize="9.5" fill="var(--text-muted)" textAnchor="end">
-        {formatShort(data[data.length - 1].date)}
-      </text>
-    </svg>
+        {/* series */}
+        {mode === 'bar'
+          ? data.map((d, i) => (
+              <rect
+                key={i}
+                x={x(i) - barW / 2}
+                y={y(d.value)}
+                width={barW}
+                height={Math.max(1, padT + innerH - y(d.value))}
+                rx={3}
+                fill={color}
+                fillOpacity={hoverIdx == null || hoverIdx === i ? 0.85 : 0.35}
+              />
+            ))
+          : (
+            <>
+              <path d={areaPath} fill={`url(#${gid})`} />
+              <path
+                d={linePath}
+                fill="none"
+                stroke={color}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle
+                cx={x(data.length - 1)}
+                cy={y(data[data.length - 1].value)}
+                r="3"
+                fill={color}
+                stroke="var(--surface-solid)"
+                strokeWidth="1.5"
+              />
+            </>
+          )}
+
+        {/* hover guide */}
+        {hoverIdx != null && (
+          <>
+            <line
+              x1={x(hoverIdx)}
+              y1={padT}
+              x2={x(hoverIdx)}
+              y2={padT + innerH}
+              stroke="var(--border-strong)"
+              strokeWidth="1"
+            />
+            <circle cx={x(hoverIdx)} cy={y(data[hoverIdx].value)} r="3.5" fill={color} stroke="var(--surface-solid)" strokeWidth="1.5" />
+          </>
+        )}
+
+        {/* x labels */}
+        <text x={padL} y={H - 4} fontSize="9.5" fill="var(--text-muted)">
+          {formatShort(data[0].date)}
+        </text>
+        <text x={padL + innerW} y={H - 4} fontSize="9.5" fill="var(--text-muted)" textAnchor="end">
+          {formatShort(data[data.length - 1].date)}
+        </text>
+      </svg>
+
+      {/* hover tooltip */}
+      {hp && (
+        <div
+          className="pointer-events-none absolute z-10 glass-strong rounded-lg px-2.5 py-1.5 text-[11px] leading-tight whitespace-nowrap"
+          style={{
+            left: `${Math.min(Math.max((x(hoverIdx!) / W) * 100, 8), 92)}%`,
+            top: 0,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          <div className="font-semibold text-[var(--text-primary)]">{fmt(hp.value)}</div>
+          <div className="text-[var(--text-muted)]">{formatShort(hp.date)}</div>
+        </div>
+      )}
+    </div>
   )
 }
