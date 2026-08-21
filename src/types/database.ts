@@ -188,6 +188,41 @@ export interface ChatMessage {
   created_at: string
 }
 
+export type ProductStatus =
+  | 'discovered'
+  | 'filtered'
+  | 'validating'
+  | 'shortlisted'
+  | 'testing'
+  | 'winner'
+  | 'scaled'
+  | 'killed'
+
+/** The research funnel: many discovered, few win. Scores are 0-10 per
+    dimension; score_total is the mean of the ones the researcher filled. */
+export interface ProductCandidate {
+  id: string
+  client_id: string
+  name: string
+  category: string | null
+  source_url: string | null
+  competitor: string | null
+  estimated_price: number | null
+  demand_evidence: string | null
+  notes: string | null
+  score_demand: number | null
+  score_competition: number | null
+  score_margin: number | null
+  score_creative: number | null
+  score_brand_fit: number | null
+  score_trend: number | null
+  status: ProductStatus
+  decision_notes: string | null
+  researcher_id: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type DataSourceId =
   | 'salla'
   | 'google_ads'

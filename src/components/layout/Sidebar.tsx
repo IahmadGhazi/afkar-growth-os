@@ -8,6 +8,7 @@ import {
   Bell,
   FileText,
   MessageSquare,
+  Package,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useApp } from '@/lib/store'
@@ -25,6 +26,7 @@ const navigation = [
   { name: 'Tasks', path: '/tasks', icon: CheckSquare },
   { name: 'Team', path: '/team', icon: Users },
   { name: 'Team Chat', path: '/chat', icon: MessageSquare },
+  { name: 'Products', path: '/products', icon: Package },
   { name: 'KPIs', path: '/kpis', icon: BarChart3 },
   { name: 'Data & Sources', path: '/data', icon: Database },
 ]

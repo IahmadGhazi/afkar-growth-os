@@ -4,12 +4,15 @@ import './index.css'
 import App from './App.tsx'
 import { initStore } from './lib/store'
 import { initTheme } from './lib/theme'
+import { ErrorBoundary } from './components/shared/ErrorBoundary'
 
 initTheme()
 initStore()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 )

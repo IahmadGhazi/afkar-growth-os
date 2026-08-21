@@ -3,12 +3,16 @@ import { X } from 'lucide-react'
 import { Sidebar } from './components/layout/Sidebar'
 import { TopBar } from './components/layout/TopBar'
 import { QuickAdd } from './components/quick-add/QuickAdd'
+import { BootScreen } from './components/shared/BootScreen'
+import { Toaster } from './lib/toast'
+import { useApp } from './lib/store'
 import { CommandCenter } from './features/command-center/CommandCenter'
 import { MyWork } from './features/my-work/MyWork'
 import { Tasks } from './features/tasks/Tasks'
 import { WeeklyPlan } from './features/objectives/WeeklyPlan'
 import { Team } from './features/team/Team'
 import { Chat } from './features/chat/Chat'
+import { Products } from './features/products/Products'
 import { Kpis } from './features/kpis/Kpis'
 import { Data } from './features/data/Data'
 import { Settings } from './features/settings/Settings'
@@ -22,6 +26,7 @@ const pageTitles: Record<string, string> = {
   '/tasks': 'Tasks',
   '/team': 'Team',
   '/chat': 'Team Chat',
+  '/products': 'Product Research',
   '/kpis': 'KPIs',
   '/data': 'Data & Sources',
   '/report': 'Client Report',
@@ -29,6 +34,7 @@ const pageTitles: Record<string, string> = {
 }
 
 function App() {
+  const { state } = useApp()
   const [currentPath, setCurrentPath] = useState('/')
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -66,6 +72,8 @@ function App() {
         return <Team />
       case '/chat':
         return <Chat />
+      case '/products':
+        return <Products />
       case '/kpis':
         return <Kpis />
       case '/data':
@@ -81,7 +89,10 @@ function App() {
 
   return (
     <div className="min-h-screen lg:flex lg:h-screen lg:overflow-hidden">
-      {/* Desktop sidebar */}
+      {!state.ready && <BootScreen />}
+      {state.ready && (
+        <>
+          {/* Desktop sidebar */}
       <div className="hidden lg:block shrink-0">
         <Sidebar
           currentPath={currentPath}
@@ -149,6 +160,9 @@ function App() {
         onClose={() => setNotificationsOpen(false)}
         onNavigate={setCurrentPath}
       />
+      <Toaster />
+        </>
+      )}
     </div>
   )
 }

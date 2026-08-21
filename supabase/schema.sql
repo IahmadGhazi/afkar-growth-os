@@ -195,6 +195,32 @@ create table if not exists public.messages (
   created_at timestamptz not null default now()
 );
 
+-- ---------- PRODUCT RESEARCH (the funnel: many discovered, few win) ----------
+create table if not exists public.product_candidates (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  name text not null,
+  category text,
+  source_url text,
+  competitor text,
+  estimated_price numeric,
+  demand_evidence text,
+  notes text,
+  score_demand integer check (score_demand between 0 and 10),
+  score_competition integer check (score_competition between 0 and 10),
+  score_margin integer check (score_margin between 0 and 10),
+  score_creative integer check (score_creative between 0 and 10),
+  score_brand_fit integer check (score_brand_fit between 0 and 10),
+  score_trend integer check (score_trend between 0 and 10),
+  status text not null default 'discovered' check (status in (
+    'discovered','filtered','validating','shortlisted','testing','winner','scaled','killed'
+  )),
+  decision_notes text,
+  researcher_id text references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- ---------- CONNECTIONS ----------
 create table if not exists public.connections (
   id text primary key,
@@ -240,6 +266,7 @@ alter table public.kpi_targets enable row level security;
 alter table public.notifications enable row level security;
 alter table public.activity_logs enable row level security;
 alter table public.messages enable row level security;
+alter table public.product_candidates enable row level security;
 alter table public.connections enable row level security;
 alter table public.sync_runs enable row level security;
 
@@ -257,6 +284,7 @@ do $$ begin
   create policy "anon full access notifications" on public.notifications for all to anon using (true) with check (true);
   create policy "anon full access activity_logs" on public.activity_logs for all to anon using (true) with check (true);
   create policy "anon full access messages" on public.messages for all to anon using (true) with check (true);
+  create policy "anon full access product_candidates" on public.product_candidates for all to anon using (true) with check (true);
   create policy "anon full access connections" on public.connections for all to anon using (true) with check (true);
   create policy "anon full access sync_runs" on public.sync_runs for all to anon using (true) with check (true);
 exception when duplicate_object then null; end $$;
@@ -491,3 +519,26 @@ insert into public.messages (id, client_id, author_id, body, created_at) values
   ('msg_3', 'cli_afkar', 'usr_sara', 'SEO landing page is live: /national-day-offers. Internal links added to menu + footer.', now() - interval '1 day'),
   ('msg_4', 'cli_afkar', 'usr_ali', 'Cart abandonment retargeting campaign is running. ROAS holding above 12 so far.', now() - interval '3 hours')
 on conflict (id) do nothing;
+
+-- Product research seed (the funnel in motion)
+insert into public.product_candidates (id, client_id, name, category, source_url, competitor, estimated_price, demand_evidence, notes, score_demand, score_competition, score_margin, score_creative, score_brand_fit, score_trend, status, decision_notes, researcher_id, created_at, updated_at) values
+  ('prod_1', 'cli_afkar', 'Abstract Gold Canvas 3-Piece Set', 'Living Room', 'https://competitor.com/gold-canvas', 'Competitor A', 449, '1.2k reviews, restocked 3x this quarter', 'Strong margin at supplier price', 9, 6, 8, 8, 9, 7, 'shortlisted', null, 'usr_mohammed', now() - interval '5 days', now() - interval '5 days'),
+  ('prod_2', 'cli_afkar', 'Neon Islamic Calligraphy Frame', 'Bedroom', 'https://competitor.com/neon-calligraphy', 'Competitor B', 299, 'Trending on TikTok #homedecor KSA', null, 8, 7, 7, 9, 8, 9, 'testing', 'Ad test started, 3 creatives live', 'usr_mohammed', now() - interval '4 days', now() - interval '1 day'),
+  ('prod_3', 'cli_afkar', 'Majlis Floor Cushion Set', 'Majlis', 'https://competitor.com/majlis-cushions', 'Competitor C', 899, 'Ramadan seasonal spike expected', null, 7, 8, 6, 6, 9, 5, 'discovered', null, 'usr_mohammed', now() - interval '2 days', now() - interval '2 days'),
+  ('prod_4', 'cli_afkar', 'Minimalist Line-Art Diptych', 'Office', null, 'Competitor D', 199, 'Low engagement on competitor listings', 'Weak differentiation, likely kill', 4, 8, 5, 4, 5, 4, 'killed', 'Demand evidence insufficient', 'usr_mohammed', now() - interval '6 days', now() - interval '3 days'),
+  ('prod_5', 'cli_afkar', '3D Wooden World Map XL', 'Living Room', 'https://competitor.com/world-map-3d', 'Competitor E', 1299, 'Highest AOV product at two competitors', 'Premium hero candidate for National Day bundle', 10, 5, 9, 9, 10, 8, 'winner', 'Scaled: 34 sales first week, ROAS 11.2', 'usr_mohammed', now() - interval '12 days', now() - interval '2 days')
+on conflict (id) do nothing;
+
+-- Snapshot integrity: one value per KPI per day. Dedupe keeping the newest
+-- write, then enforce with a unique index. Both guarded so a re-run can
+-- never abort the file mid-way.
+do $$ begin
+  delete from public.kpi_snapshots a using public.kpi_snapshots b
+    where a.kpi_id = b.kpi_id
+      and a.snapshot_date = b.snapshot_date
+      and a.created_at < b.created_at;
+exception when others then null; end $$;
+
+do $$ begin
+  execute 'create unique index if not exists kpi_snapshots_unique_day on public.kpi_snapshots (kpi_id, snapshot_date)';
+exception when others then null; end $$;

@@ -10,6 +10,7 @@ import type {
   KpiTarget,
   Notification,
   Organization,
+  ProductCandidate,
   Profile,
   SyncRun,
   Task,
@@ -61,7 +62,7 @@ export const backend = {
   available: backendAvailable,
 
   async loadAll() {
-    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages] =
+    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages, products] =
       await Promise.all([
         selectAllSafe<Organization>('organizations'),
         selectAllSafe<Client>('clients'),
@@ -78,6 +79,7 @@ export const backend = {
         selectAllSafe<Notification>('notifications'),
         selectAllSafe<ActivityLog>('activity_logs'),
         selectAllSafe<ChatMessage>('messages', 'created_at'),
+        selectAllSafe<ProductCandidate>('product_candidates'),
       ])
     return {
       organization: organization[0] ?? null,
@@ -95,6 +97,7 @@ export const backend = {
       notifications,
       activity,
       messages,
+      products,
     }
   },
 
@@ -144,4 +147,8 @@ export const backend = {
   insertActivity: (row: ActivityLog) => upsert('activity_logs', row),
 
   insertMessage: (row: ChatMessage) => upsert('messages', row),
+
+  insertProduct: (row: ProductCandidate) => upsert('product_candidates', row),
+  updateProduct: (id: string, patch: Record<string, unknown>) => updateById('product_candidates', id, patch),
+  deleteProduct: (id: string) => remove('product_candidates', id),
 }

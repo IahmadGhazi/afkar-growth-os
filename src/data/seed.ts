@@ -9,6 +9,7 @@ import type {
   KpiTarget,
   Notification,
   Organization,
+  ProductCandidate,
   Profile,
   SyncRun,
   Task,
@@ -33,6 +34,10 @@ export interface AppState {
   notifications: Notification[]
   activity: ActivityLog[]
   messages: ChatMessage[]
+  products: ProductCandidate[]
   currentUserId: string | null
   currentClientId: string | null
+  /** False until the first backend bootstrap resolves; the shell shows a
+      boot skeleton instead of a lying "empty workspace". */
+  ready: boolean
 }

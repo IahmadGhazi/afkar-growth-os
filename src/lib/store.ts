@@ -17,10 +17,13 @@ import type {
   SyncRun,
   DataSourceId,
   ChatMessage,
+  ProductCandidate,
+  ProductStatus,
 } from '../types/database'
 import type { AppState } from '../data/seed'
 import { todayISO } from './date'
-import { backend } from './backend'
+import { backend as rawBackend } from './backend'
+import { toast } from './toast'
 
 type Listener = () => void
 
@@ -50,13 +53,17 @@ function emptyState(): AppState {
     notifications: [],
     activity: [],
     messages: [],
+    products: [],
     currentUserId: null,
     currentClientId: null,
+    ready: false,
   }
 }
 
 let state: AppState = emptyState()
 let bootstrapped = false
+let refreshing = false
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
 const listeners = new Set<Listener>()
 
 function notify() {
@@ -72,12 +79,75 @@ export function uid(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
 }
 
+/** THE TRUST LAYER. Every backend write goes through this proxy: a rejected
+    promise is announced (toast), logged, and the store re-syncs from the
+    server so the optimistic UI never keeps a lie on screen. */
+function writeFailure(err: unknown) {
+  console.error('Write failed:', err)
+  toast.error(
+    `Saved on this device only — it did not reach the database${
+      err instanceof Error ? ` (${err.message})` : ''
+    }. Reloading the truth.`,
+  )
+  if (refreshTimer) clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(() => refreshFromServer(), 900)
+}
+
+const backend = new Proxy(rawBackend, {
+  get(target, prop) {
+    const value = Reflect.get(target, prop)
+    if (typeof value !== 'function') return value
+    return (...args: unknown[]) => {
+      const out = (value as (...a: unknown[]) => unknown)(...args)
+      if (out && typeof (out as Promise<unknown>).catch === 'function') {
+        return (out as Promise<unknown>).catch((err: unknown) => {
+          writeFailure(err)
+          throw err
+        })
+      }
+      return out
+    }
+  },
+})
+
+/** Re-pull server truth (used after failures and for future live sync). */
+async function refreshFromServer() {
+  if (refreshing || !rawBackend.available) return
+  refreshing = true
+  try {
+    const data = await rawBackend.loadAll()
+    set((s) => ({
+      ...s,
+      organization: data.organization ?? s.organization,
+      clients: data.clients,
+      profiles: data.profiles,
+      clientAssignments: data.clientAssignments,
+      tasks: data.tasks,
+      objectives: data.objectives,
+      keyResults: data.keyResults,
+      kpiDefinitions: data.kpiDefinitions,
+      kpiTargets: data.kpiTargets,
+      kpiSnapshots: data.kpiSnapshots,
+      connections: data.connections,
+      syncLog: data.syncLog,
+      notifications: data.notifications,
+      activity: data.activity,
+      messages: data.messages,
+      products: data.products,
+    }))
+  } catch (err) {
+    console.error('Refresh failed:', err)
+  } finally {
+    refreshing = false
+  }
+}
+
 async function bootstrap() {
   if (bootstrapped) return
   bootstrapped = true
   try {
     if (!backend.available) {
-      set((s) => ({ ...s, organization: emptyState().organization }))
+      set((s) => ({ ...s, organization: emptyState().organization, ready: true }))
       return
     }
     const data = await backend.loadAll()
@@ -99,6 +169,7 @@ async function bootstrap() {
         notifications: data.notifications,
         activity: data.activity,
         messages: data.messages,
+        products: data.products,
       }
       // Derive the current user from the backend (no login yet): first active
       // admin/super_admin profile, else the first active profile.
@@ -116,6 +187,10 @@ async function bootstrap() {
     })
   } catch (err) {
     console.error('bootstrap failed', err)
+    toast.error('Could not load your workspace. Check the connection and reload.')
+  } finally {
+    bootstrapped = true
+    set((s) => ({ ...s, ready: true }))
   }
 }
 
@@ -371,8 +446,9 @@ export const actions = {
       const rest = s.kpiSnapshots.filter(
         (snap) => !(snap.kpi_id === kpiId && snap.client_id === clientId && snap.snapshot_date === date),
       )
+      // Deterministic id: one row per KPI per day, re-saving overwrites.
       const snapshot: KpiSnapshot = {
-        id: uid('snap'),
+        id: `snap_${kpiId}_${date}`,
         kpi_id: kpiId,
         client_id: clientId,
         snapshot_date: date,
@@ -381,7 +457,7 @@ export const actions = {
         notes: null,
         created_at: new Date().toISOString(),
       }
-      backend.insertSnapshot(snapshot).catch((err) => console.error(err))
+      backend.insertSnapshot(snapshot).catch(() => undefined)
       return { ...s, kpiSnapshots: [...rest, snapshot] }
     })
   },
@@ -400,7 +476,7 @@ export const actions = {
           (snap) => !(snap.kpi_id === kpiId && snap.client_id === clientId && snap.snapshot_date === date),
         )
         const snapshot: KpiSnapshot = {
-          id: uid('snap'),
+          id: `snap_${kpiId}_${date}`,
           kpi_id: kpiId,
           client_id: clientId,
           snapshot_date: date,
@@ -412,7 +488,7 @@ export const actions = {
         snapshots = [...snapshots, snapshot]
         created.push(snapshot)
       }
-      created.forEach((snapshot) => backend.insertSnapshot(snapshot).catch((err) => console.error(err)))
+      created.forEach((snapshot) => backend.insertSnapshot(snapshot).catch(() => undefined))
       return { ...s, kpiSnapshots: snapshots }
     })
   },
@@ -678,9 +754,71 @@ export const actions = {
         body: body.trim(),
         created_at: new Date().toISOString(),
       }
-      backend.insertMessage(message).catch((err) => console.error(err))
+      backend.insertMessage(message).catch(() => undefined)
       return { ...s, messages: [...s.messages, message] }
     })
+  },
+
+  addProduct(input: {
+    name: string
+    category: string | null
+    sourceUrl: string | null
+    competitor: string | null
+    estimatedPrice: number | null
+    demandEvidence: string | null
+    notes: string | null
+    scores: Partial<Record<'demand' | 'competition' | 'margin' | 'creative' | 'brandFit' | 'trend', number | null>>
+  }) {
+    set((s) => {
+      const clientId = s.currentClientId
+      if (!clientId) return s
+      const product: ProductCandidate = {
+        id: uid('prod'),
+        client_id: clientId,
+        name: input.name,
+        category: input.category,
+        source_url: input.sourceUrl,
+        competitor: input.competitor,
+        estimated_price: input.estimatedPrice,
+        demand_evidence: input.demandEvidence,
+        notes: input.notes,
+        score_demand: input.scores.demand ?? null,
+        score_competition: input.scores.competition ?? null,
+        score_margin: input.scores.margin ?? null,
+        score_creative: input.scores.creative ?? null,
+        score_brand_fit: input.scores.brandFit ?? null,
+        score_trend: input.scores.trend ?? null,
+        status: 'discovered',
+        decision_notes: null,
+        researcher_id: s.currentUserId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      backend.insertProduct(product).catch(() => undefined)
+      return { ...s, products: [...s.products, product] }
+    })
+    toast.success('Candidate added to the funnel.')
+  },
+
+  updateProduct(id: string, patch: Partial<ProductCandidate>) {
+    set((s) => ({
+      ...s,
+      products: s.products.map((p) =>
+        p.id === id ? { ...p, ...patch, updated_at: new Date().toISOString() } : p,
+      ),
+    }))
+    backend
+      .updateProduct(id, { ...patch, updated_at: new Date().toISOString() })
+      .catch(() => undefined)
+  },
+
+  moveProduct(id: string, status: ProductStatus) {
+    actions.updateProduct(id, { status })
+  },
+
+  deleteProduct(id: string) {
+    set((s) => ({ ...s, products: s.products.filter((p) => p.id !== id) }))
+    backend.deleteProduct(id).catch(() => undefined)
   },
 
   resetAll() {
