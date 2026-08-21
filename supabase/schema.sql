@@ -566,7 +566,8 @@ insert into public.messages (id, client_id, author_id, body, created_at) values
   ('msg_4', 'cli_afkar', 'usr_ali', 'Cart abandonment retargeting campaign is running. ROAS holding above 12 so far.', now() - interval '3 hours')
 on conflict (id) do nothing;
 
--- Product research seed (the funnel in motion)insert into public.product_candidates (id, client_id, name, category, source_url, competitor, estimated_price, demand_evidence, notes, score_demand, score_competition, score_margin, score_creative, score_brand_fit, score_trend, status, decision_notes, researcher_id, created_at, updated_at) values
+-- Product research seed (the funnel in motion)
+insert into public.product_candidates (id, client_id, name, category, source_url, competitor, estimated_price, demand_evidence, notes, score_demand, score_competition, score_margin, score_creative, score_brand_fit, score_trend, status, decision_notes, researcher_id, created_at, updated_at) values
   ('prod_1', 'cli_afkar', 'Abstract Gold Canvas 3-Piece Set', 'Living Room', 'https://competitor.com/gold-canvas', 'Competitor A', 449, '1.2k reviews, restocked 3x this quarter', 'Strong margin at supplier price', 9, 6, 8, 8, 9, 7, 'shortlisted', null, 'usr_mohammed', now() - interval '5 days', now() - interval '5 days'),
   ('prod_2', 'cli_afkar', 'Neon Islamic Calligraphy Frame', 'Bedroom', 'https://competitor.com/neon-calligraphy', 'Competitor B', 299, 'Trending on TikTok #homedecor KSA', null, 8, 7, 7, 9, 8, 9, 'testing', 'Ad test started, 3 creatives live', 'usr_mohammed', now() - interval '4 days', now() - interval '1 day'),
   ('prod_3', 'cli_afkar', 'Majlis Floor Cushion Set', 'Majlis', 'https://competitor.com/majlis-cushions', 'Competitor C', 899, 'Ramadan seasonal spike expected', null, 7, 8, 6, 6, 9, 5, 'discovered', null, 'usr_mohammed', now() - interval '2 days', now() - interval '2 days'),
