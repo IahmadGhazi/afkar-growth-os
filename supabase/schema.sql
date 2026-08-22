@@ -758,6 +758,30 @@ do $$ begin
 exception when others then null; end $$;
 
 -- ============================================================
+-- PER-CLIENT SCOPING (prepared; activate when client #2 exists)
+-- Helpers are LIVE now. When a second client is added:
+--   1) assign team: insert into public.client_assignments ...
+--   2) swap each "team full access <table>" policy to:
+--      using (public.can_access_client(client_id)) with check (same)
+--      on every business table that carries client_id.
+-- Until then the team-wide policies above stay in charge.
+-- ============================================================
+create or replace function public.current_profile_id() returns text as $$
+  select id from public.profiles where auth_user_id = auth.uid() limit 1
+$$ language sql security definer stable;
+
+create or replace function public.my_role() returns text as $$
+  select role from public.profiles where auth_user_id = auth.uid() limit 1
+$$ language sql security definer stable;
+
+create or replace function public.can_access_client(_client_id text) returns boolean as $$
+  select exists (
+    select 1 from public.client_assignments ca
+    where ca.user_id = public.current_profile_id() and ca.client_id = _client_id
+  ) or coalesce(public.my_role() in ('super_admin','account_manager'), false)
+$$ language sql security definer stable;
+
+-- ============================================================
 -- REALTIME: live sync across devices. Idempotent (re-adding a
 -- table to the publication raises 42710 - swallowed here).
 -- ============================================================

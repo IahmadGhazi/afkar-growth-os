@@ -26,6 +26,7 @@ import type {
 } from '../types/database'
 import type { AppState } from '../data/seed'
 import { todayISO } from './date'
+import { DONE_STATUSES } from './selectors'
 import { backend as rawBackend } from './backend'
 import { supabase } from './supabase'
 import { toast } from './toast'
@@ -169,6 +170,7 @@ async function refreshFromServer() {
       campaignMetrics: data.campaignMetrics,
       taskComments: data.taskComments,
     }))
+    sweepOverdue()
   } catch (err) {
     console.error('Refresh failed:', err)
   } finally {
@@ -238,6 +240,7 @@ async function bootstrap() {
   } finally {
     bootstrapped = true
     set((s) => ({ ...s, ready: true }))
+    sweepOverdue()
   }
 }
 
@@ -1080,6 +1083,35 @@ function subscribe(cb: Listener) {
 
 function getState() {
   return state
+}
+
+/** OVERDUE SWEEP: any task past due and not done/blocked pings its assignee
+    once. Idempotent - the dedupe key (assignee+title) means re-runs and
+    realtime refreshes never duplicate a bell. */
+function sweepOverdue() {
+  set((s) => {
+    const clientId = s.currentClientId
+    const actor = s.currentUserId
+    if (!clientId || !actor) return s
+    const today = todayISO()
+    const seen = new Set(
+      s.notifications.filter((n) => n.type === 'task_overdue').map((n) => `${n.user_id}:${n.title}`),
+    )
+    const fresh: Notification[] = []
+    for (const t of s.tasks) {
+      if (!t.assignee_id || !t.due_date || t.due_date >= today) continue
+      if (DONE_STATUSES.includes(t.status) || t.status === 'blocked') continue
+      const key = `${t.assignee_id}:${t.title}`
+      if (seen.has(key)) continue
+      fresh.push(
+        makeNotification(uid('ntf'), t.assignee_id, clientId, 'task_overdue', `Overdue: ${t.title}`, `Was due ${t.due_date}`, '/my-work'),
+      )
+      seen.add(key)
+    }
+    if (fresh.length === 0) return s
+    fresh.forEach((n) => backend.insertNotification(n).catch(() => undefined))
+    return { ...s, notifications: [...fresh, ...s.notifications] }
+  })
 }
 
 export function initStore() {
