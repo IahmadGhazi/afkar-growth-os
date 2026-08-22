@@ -1206,14 +1206,33 @@ export function resetForSignOut() {
 let liveSyncStarted = false
 let liveChannel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null
 
+let typingUsers: Array<{ name: string; role: string }> = []
+
 /** Broadcast a typing indicator to other team members. */
-export function broadcastTyping(userName: string) {
+export function broadcastTyping(userName: string, userRole: string) {
   if (!liveChannel || !supabase) return
   liveChannel.send({
     type: 'broadcast',
     event: 'typing',
-    payload: { name: userName, at: Date.now() },
+    payload: { name: userName, role: userRole, at: Date.now() },
   })
+}
+
+export function subscribeTyping(cb: (users: Array<{ name: string; role: string }>) => void) {
+  if (!liveChannel) return () => {}
+  liveChannel.on('broadcast', { event: 'typing' }, (payload: { payload?: { name?: string; role?: string } }) => {
+    const p = payload.payload
+    if (!p?.name) return
+    const idx = typingUsers.findIndex((u) => u.name === p.name)
+    if (idx >= 0) typingUsers.splice(idx, 1)
+    typingUsers.push({ name: p.name, role: p.role ?? '' })
+    cb([...typingUsers])
+    setTimeout(() => {
+      typingUsers = typingUsers.filter((u) => u.name !== p.name)
+      cb([...typingUsers])
+    }, 3000)
+  })
+  return () => {}
 }
 
 /** LIVE SYNC. Supabase Realtime pushes INSERT/UPDATE/DELETE on the tables

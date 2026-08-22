@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Send, MessageSquare, Search, Smile, Pencil, Trash2, Check, X, ArrowDown } from 'lucide-react'
-import { useApp, broadcastTyping } from '../../lib/store'
+import { useApp, broadcastTyping, subscribeTyping } from '../../lib/store'
 import { roleLabel } from '../../lib/selectors'
 import type { ChatMessage, Profile } from '../../types/database'
 
@@ -200,21 +200,15 @@ export function Chat() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [showJump, setShowJump] = useState(false)
-  const [typingName, setTypingName] = useState<string | null>(null)
+  const [typingUsers, setTypingUsers] = useState<Array<{ name: string; role: string }>>([])
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
-  const clientId = state.currentUserId
-  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clientId = state.currentClientId
 
   // Listen for typing broadcasts from other team members
   useEffect(() => {
-    const handler = () => {
-      setTypingName('a teammate')
-      if (typingTimer.current) clearTimeout(typingTimer.current)
-      typingTimer.current = setTimeout(() => setTypingName(null), 3000)
-    }
-    window.addEventListener('afkar-typing', handler)
-    return () => window.removeEventListener('afkar-typing', handler)
+    const unsub = subscribeTyping((users) => setTypingUsers(users))
+    return unsub
   }, [])
 
   const messages = useMemo(() => {
@@ -348,16 +342,17 @@ export function Chat() {
           </button>
         )}
 
-        {typingName && (
-          <div className="px-4 pb-1 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+        {typingUsers.map((u) => (
+          <div key={u.name} className="px-4 pb-1 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             <span className="flex gap-0.5">
               {[0, 1, 2].map((i) => (
                 <span key={i} className="w-1.5 h-1.5 rounded-full bg-[var(--brand)] inline-block animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
               ))}
             </span>
-            {typingName} is typing…
+            <span className="font-semibold text-[var(--brand)]">{u.name}</span>
+            <span>({u.role})</span> is typing…
           </div>
-        )}
+        ))}
 
         <div className="border-t border-[var(--hairline)] p-3">
           <div className="flex items-end gap-2">
@@ -365,7 +360,8 @@ export function Chat() {
               value={draft}
               onChange={(e) => {
                 setDraft(e.target.value)
-                if (draft.trim()) broadcastTyping(authorName(state.profiles, state.currentUserId ?? ''))
+                const me = state.profiles.find((pr) => pr.id === state.currentUserId)
+                if (me) broadcastTyping(me.full_name ?? '', roleLabel(me.role))
               }}
               onKeyDown={handleKeyDown}
               rows={1}
