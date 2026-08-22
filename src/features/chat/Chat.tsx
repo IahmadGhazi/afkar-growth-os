@@ -1,10 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Send, MessageSquare, Search, Smile, Pencil, Trash2, Check, X, ArrowDown } from 'lucide-react'
-import { useApp } from '../../lib/store'
+import { useApp, broadcastTyping } from '../../lib/store'
 import { roleLabel } from '../../lib/selectors'
 import type { ChatMessage, Profile } from '../../types/database'
 
 const QUICK_REACTIONS = ['👍', '🎉', '❤️', '😄', '👀']
+
+/** Renders @Name mentions in gold semibold. */
+function renderBody(body: string, profiles: Profile[]) {
+  const parts = body.split(/(@[\w\u0600-\u06FF][\w\u0600-\u06FF\s]*?)(?=\s|$|[,!.?])/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('@')) {
+      const name = part.slice(1).trim().toLowerCase()
+      const match = profiles.find((p) => p.full_name?.toLowerCase() === name)
+      if (match) return <span key={i} className="font-semibold text-[var(--brand)]">@{match.full_name}</span>
+    }
+    return <span key={i}>{part}</span>
+  })
+}
 
 function authorName(profiles: Profile[], id: string): string {
   return profiles.find((p) => p.id === id)?.full_name ?? 'Unknown'
@@ -49,6 +62,7 @@ function MessageRow({
   grouped,
   isMine,
   currentUserId,
+  profiles,
   onReact,
   onEdit,
   onDelete,
@@ -61,6 +75,7 @@ function MessageRow({
   grouped: boolean
   isMine: boolean
   currentUserId: string | null
+  profiles: Profile[]
   onReact: (emoji: string) => void
   onEdit: () => void
   onDelete: () => void
@@ -118,7 +133,7 @@ function MessageRow({
           </div>
         )}
         <div className="text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words pr-16">
-          {message.body}
+          {renderBody(message.body, profiles ?? [])}
           {message.edited_at && (
             <span className="ml-1.5 text-[10px] text-[var(--text-muted)]">(edited)</span>
           )}
@@ -185,9 +200,22 @@ export function Chat() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [showJump, setShowJump] = useState(false)
+  const [typingName, setTypingName] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
-  const clientId = state.currentClientId
+  const clientId = state.currentUserId
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Listen for typing broadcasts from other team members
+  useEffect(() => {
+    const handler = () => {
+      setTypingName('a teammate')
+      if (typingTimer.current) clearTimeout(typingTimer.current)
+      typingTimer.current = setTimeout(() => setTypingName(null), 3000)
+    }
+    window.addEventListener('afkar-typing', handler)
+    return () => window.removeEventListener('afkar-typing', handler)
+  }, [])
 
   const messages = useMemo(() => {
     let list = (state.messages ?? []).filter((m) => !clientId || m.client_id === clientId)
@@ -292,6 +320,7 @@ export function Chat() {
                     grouped={grouped}
                     isMine={m.author_id === currentUserId}
                     currentUserId={currentUserId}
+                    profiles={state.profiles}
                     onReact={(emoji) => actions.toggleReaction(m.id, emoji)}
                     onEdit={() => setEditingId(m.id)}
                     onDelete={() => actions.deleteMessage(m.id)}
@@ -319,11 +348,25 @@ export function Chat() {
           </button>
         )}
 
+        {typingName && (
+          <div className="px-4 pb-1 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+            <span className="flex gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <span key={i} className="w-1.5 h-1.5 rounded-full bg-[var(--brand)] inline-block animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+              ))}
+            </span>
+            {typingName} is typing…
+          </div>
+        )}
+
         <div className="border-t border-[var(--hairline)] p-3">
           <div className="flex items-end gap-2">
             <textarea
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value)
+                if (draft.trim()) broadcastTyping(authorName(state.profiles, state.currentUserId ?? ''))
+              }}
               onKeyDown={handleKeyDown}
               rows={1}
               placeholder={`Message #team as ${currentUserId ? authorName(state.profiles, currentUserId) : '...'}`}

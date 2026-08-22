@@ -61,6 +61,7 @@ export function Tasks() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<TaskInput>(emptyForm)
   const [editing, setEditing] = useState<Task | null>(null)
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null)
 
   const clientId = state.currentClientId
   const tasks = tasksForClient(state, clientId)
@@ -182,7 +183,20 @@ export function Tasks() {
         {statusColumns.map((column) => {
           const columnTasks = filteredTasks.filter((t) => t.status === column.status)
           return (
-            <div key={column.status} className="flex-shrink-0 w-72 snap-start">
+            <div
+              key={column.status}
+              className={`flex-shrink-0 w-72 snap-start rounded-2xl transition-all ${
+                dragOverCol === column.status ? 'ring-2 ring-[var(--brand)] ring-inset bg-[var(--brand-soft)]' : ''
+              }`}
+              onDragOver={(e) => { e.preventDefault(); setDragOverCol(column.status) }}
+              onDragLeave={() => setDragOverCol(null)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragOverCol(null)
+                const taskId = e.dataTransfer.getData('text/plain')
+                if (taskId) actions.moveTask(taskId, column.status)
+              }}
+            >
               <div className="flex items-center gap-2 mb-3 px-1">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: column.color }} />
                 <span className="text-sm font-semibold text-[var(--text-primary)]">
@@ -204,7 +218,9 @@ export function Tasks() {
                   return (
                     <div
                       key={task.id}
-                      className={`glass-sm p-3 relative overflow-hidden ${task.status === 'blocked' ? 'glass-danger' : 'glass-hover-brand'}`}
+                      draggable
+                      onDragStart={(e) => e.dataTransfer.setData('text/plain', task.id)}
+                      className={`glass-sm p-3 cursor-grab active:cursor-grabbing relative overflow-hidden ${task.status === 'blocked' ? 'glass-danger' : 'glass-hover-brand'}`}
                       style={{
                         borderLeft: `4px solid ${
                           task.priority === 'critical' ? 'var(--critical)' :

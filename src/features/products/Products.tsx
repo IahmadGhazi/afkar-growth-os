@@ -6,7 +6,6 @@ import {
   ArrowRight,
   Ban,
   Trash2,
-  ExternalLink,
   Trophy,
   FlaskConical,
 } from 'lucide-react'
@@ -120,7 +119,13 @@ function ProductCard({
             rel="noreferrer"
             className="inline-flex items-center gap-1 text-[var(--brand)] hover:underline"
           >
-            {host} <ExternalLink size={11} />
+            <img
+              src={`https://www.google.com/s2/favicons?domain=${host}&sz=16`}
+              alt=""
+              className="w-3.5 h-3.5 rounded-sm inline-block"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+            {host}
           </a>
         )}
       </div>

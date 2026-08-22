@@ -1204,6 +1204,17 @@ export function resetForSignOut() {
 }
 
 let liveSyncStarted = false
+let liveChannel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null
+
+/** Broadcast a typing indicator to other team members. */
+export function broadcastTyping(userName: string) {
+  if (!liveChannel || !supabase) return
+  liveChannel.send({
+    type: 'broadcast',
+    event: 'typing',
+    payload: { name: userName, at: Date.now() },
+  })
+}
 
 /** LIVE SYNC. Supabase Realtime pushes INSERT/UPDATE/DELETE on the tables
     in the supabase_realtime publication; we debounce one server re-pull so
@@ -1212,9 +1223,16 @@ let liveSyncStarted = false
 function startLiveSync() {
   if (!supabase || liveSyncStarted) return
   liveSyncStarted = true
-  const channel = supabase.channel('afkar-live-sync')
+  liveChannel = supabase.channel('afkar-live-sync', {
+    config: { broadcast: { self: false } },
+  })
+  liveChannel.on('broadcast', { event: 'typing' }, () => {
+    window.dispatchEvent(new CustomEvent('afkar-typing', {
+      detail: { at: Date.now() },
+    }))
+  })
   for (const table of ['messages', 'tasks', 'product_candidates', 'kpi_snapshots', 'task_comments', 'campaigns', 'campaign_metrics']) {
-    channel.on(
+    liveChannel.on(
       'postgres_changes',
       { event: '*', schema: 'public', table },
       () => {
@@ -1223,5 +1241,5 @@ function startLiveSync() {
       },
     )
   }
-  channel.subscribe()
+  liveChannel.subscribe()
 }
