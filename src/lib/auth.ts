@@ -68,6 +68,18 @@ export async function signIn(email: string, password: string): Promise<{ error: 
   return { error: error?.message ?? null }
 }
 
+/** First-time owner setup: creates the auth account; the DB trigger links it
+    to the super-admin profile waiting under this email. Requires email
+    confirmation to be disabled in the dashboard (internal tool). */
+export async function signUp(email: string, password: string): Promise<{ error: string | null; needsConfirmation: boolean }> {
+  if (!supabase) return { error: 'Supabase is not configured.', needsConfirmation: false }
+  const { data, error } = await supabase.auth.signUp({ email, password })
+  return {
+    error: error?.message ?? null,
+    needsConfirmation: !error && !data.session,
+  }
+}
+
 export async function signOut() {
   await supabase?.auth.signOut()
 }

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { SectionTitle, EmptyState } from '../../components/shared/ui'
-import { nameById } from '../../lib/selectors'
+import { canAccess, nameById } from '../../lib/selectors'
 import { todayISO } from '../../lib/date'
 import type { Campaign, CampaignMetric, CampaignPlatform } from '../../types/database'
 
@@ -200,6 +200,15 @@ export function Campaigns() {
   const { state, actions } = useApp()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ name: '', platform: 'google_ads' as CampaignPlatform, budget: '', objective: '', startDate: todayISO() })
+
+  if (!canAccess(state, 'campaigns')) {
+    return (
+      <EmptyState
+        title="Media desk only"
+        hint="Campaigns and ad spend are visible to admins and the media buyer."
+      />
+    )
+  }
 
   const campaigns = state.campaigns.filter((c) => c.client_id === state.currentClientId)
 

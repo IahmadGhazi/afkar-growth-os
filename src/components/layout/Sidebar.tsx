@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useApp } from '@/lib/store'
+import { canAccess } from '@/lib/selectors'
 
 interface SidebarProps {
   currentPath: string
@@ -20,21 +21,29 @@ interface SidebarProps {
   onOpenNotifications?: () => void
 }
 
-const navigation = [
-  { name: 'Command Center', path: '/', icon: LayoutDashboard },
-  { name: 'My Work', path: '/my-work', icon: CheckSquare },
-  { name: 'Weekly Plan', path: '/weekly-plan', icon: Target },
-  { name: 'Tasks', path: '/tasks', icon: CheckSquare },
-  { name: 'Team', path: '/team', icon: Users },
-  { name: 'Team Chat', path: '/chat', icon: MessageSquare },
-  { name: 'Products', path: '/products', icon: Package },
-  { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
-  { name: 'KPIs', path: '/kpis', icon: BarChart3 },
-  { name: 'Data & Sources', path: '/data', icon: Database },
+const allNavigation: {
+  name: string
+  path: string
+  icon: typeof LayoutDashboard
+  section: 'campaigns' | 'users' | null
+}[] = [
+  { name: 'Command Center', path: '/', icon: LayoutDashboard, section: null },
+  { name: 'My Work', path: '/my-work', icon: CheckSquare, section: null },
+  { name: 'Weekly Plan', path: '/weekly-plan', icon: Target, section: null },
+  { name: 'Tasks', path: '/tasks', icon: CheckSquare, section: null },
+  { name: 'Team', path: '/team', icon: Users, section: null },
+  { name: 'Team Chat', path: '/chat', icon: MessageSquare, section: null },
+  { name: 'Products', path: '/products', icon: Package, section: null },
+  { name: 'Campaigns', path: '/campaigns', icon: Megaphone, section: 'campaigns' },
+  { name: 'KPIs', path: '/kpis', icon: BarChart3, section: null },
+  { name: 'Data & Sources', path: '/data', icon: Database, section: null },
 ]
 
 export function Sidebar({ currentPath, onNavigate, onOpenNotifications }: SidebarProps) {
   const { state } = useApp()
+  const navigation = allNavigation.filter(
+    (item) => item.section == null || canAccess(state, item.section),
+  )
   const currentUser = state.profiles.find((p) => p.id === state.currentUserId)
   const unread = (state.notifications ?? []).filter(
     (n) => (!currentUser || n.user_id === currentUser.id) && !n.is_read,

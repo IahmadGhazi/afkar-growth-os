@@ -94,14 +94,27 @@ function App() {
     }
   }
 
+  // Gates render standalone full-screen pages (outside the flex shell).
+  if (auth.status === 'loading' || (auth.status === 'signed-in' && !state.ready)) {
+    return (
+      <>
+        <BootScreen />
+        <Toaster />
+      </>
+    )
+  }
+  if (auth.status === 'signed-out') {
+    return (
+      <>
+        <Login />
+        <Toaster />
+      </>
+    )
+  }
+
   return (
     <div className="min-h-screen lg:flex lg:h-screen lg:overflow-hidden">
-      {auth.status === 'loading' && <BootScreen />}
-      {auth.status === 'signed-out' && <Login />}
-      {auth.status === 'signed-in' && !state.ready && <BootScreen />}
-      {auth.status === 'signed-in' && state.ready && (
-        <>
-          {/* Desktop sidebar */}
+      {/* Desktop sidebar */}
       <div className="hidden lg:block shrink-0">
         <Sidebar
           currentPath={currentPath}
@@ -170,8 +183,6 @@ function App() {
         onNavigate={setCurrentPath}
       />
       <Toaster />
-        </>
-      )}
     </div>
   )
 }

@@ -11,10 +11,12 @@ import {
   LogOut,
 } from 'lucide-react'
 import { useApp } from '../../lib/store'
-import { currentClient, getConnection } from '../../lib/selectors'
+import { currentClient, currentUser, getConnection } from '../../lib/selectors'
 import { SOURCES } from '../../lib/integrations'
 import { backendAvailable } from '../../lib/backend'
 import { signOut, useAuth } from '../../lib/auth'
+import { canAccess } from '../../lib/selectors'
+import { UsersPanel } from './UsersPanel'
 
 function Toggle({
   checked,
@@ -51,6 +53,7 @@ export function Settings() {
   const [name, setName] = useState(state.organization.name)
 
   const client = currentClient(state)
+  const me = currentUser(state)
 
   const handleSignOut = () => {
     void signOut()
@@ -63,20 +66,38 @@ export function Settings() {
   }
 
   const teams = state.profiles.filter((p) => p.is_active)
-  const roles = new Set(teams.map((p) => p.role)).size
+  const rolesInUse = new Set(teams.map((p) => p.role)).size
   const prefs = state.organization.settings
   const setPref = (key: string, value: boolean) => {
     actions.updateOrganization({ settings: { ...prefs, [key]: value } })
   }
   const integrationSources = SOURCES.filter((source) => source.id !== 'manual')
   const connectedCount = state.connections.filter((connection) => connection.connected).length
+  const isAdmin = me?.role === 'super_admin' && canAccess(state, 'users')
+  const [tab, setTab] = useState<'general' | 'users'>('general')
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-        Settings
-      </h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-[var(--text-primary)]">Settings</h2>
+        {isAdmin && (
+          <div className="flex gap-1 glass-card rounded-xl p-1">
+            {(['general', 'users'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`btn !py-1.5 !px-3 text-xs capitalize ${tab === t ? 'btn-primary' : 'btn-ghost'}`}
+              >
+                {t === 'users' ? 'Users' : 'General'}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
+      {isAdmin && tab === 'users' && <UsersPanel />}
+
+      {(!isAdmin || tab === 'general') && (
       <div className="space-y-4">
         {/* Organization */}
         <div className="glass-card p-6">
@@ -150,7 +171,7 @@ export function Settings() {
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[var(--hairline)]">
               <span className="text-sm text-[var(--text-secondary)]">Roles in Use</span>
-              <span className="text-sm font-medium text-[var(--text-primary)]">{roles}</span>
+              <span className="text-sm font-medium text-[var(--text-primary)]">{rolesInUse}</span>
             </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-[var(--text-secondary)]">Pending Invites</span>
@@ -274,6 +295,7 @@ export function Settings() {
           </div>
         </div>
       </div>
+      )}
     </div>
   )
 }

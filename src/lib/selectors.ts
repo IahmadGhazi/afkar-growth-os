@@ -174,6 +174,23 @@ export function roleLabel(role: Profile['role']): string {
   return labels[role]
 }
 
+export type RestrictedSection = 'users' | 'campaigns' | 'report'
+
+/** What each role may open. The principle: money and people management are
+    admin surfaces; ad operations belong to the media desk; everything else
+    is shared team ground. */
+const SECTION_ROLES: Record<RestrictedSection, Profile['role'][]> = {
+  users: ['super_admin'],
+  campaigns: ['super_admin', 'account_manager', 'media_buyer'],
+  report: ['super_admin', 'account_manager', 'media_buyer'],
+}
+
+export function canAccess(state: AppState, section: RestrictedSection): boolean {
+  const user = currentUser(state)
+  if (!user) return false
+  return SECTION_ROLES[section].includes(user.role)
+}
+
 export function teamMemberStats(state: AppState, profile: Profile) {
   const tasks = tasksForUser(state, profile.id)
   const overdue = tasks.filter(isTaskOverdue).length
