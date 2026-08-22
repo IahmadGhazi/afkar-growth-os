@@ -1127,12 +1127,15 @@ export function resetForSignOut() {
   notify()
 }
 
+let liveSyncStarted = false
+
 /** LIVE SYNC. Supabase Realtime pushes INSERT/UPDATE/DELETE on the tables
     in the supabase_realtime publication; we debounce one server re-pull so
     every open device converges without a manual refresh. If the publication
     is not set up yet (schema not re-run) this simply never fires - graceful. */
 function startLiveSync() {
-  if (!supabase) return
+  if (!supabase || liveSyncStarted) return
+  liveSyncStarted = true
   const channel = supabase.channel('afkar-live-sync')
   for (const table of ['messages', 'tasks', 'product_candidates', 'kpi_snapshots', 'task_comments', 'campaigns', 'campaign_metrics']) {
     channel.on(
