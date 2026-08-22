@@ -22,11 +22,26 @@ export function StatusDot({ color }: { color: string }) {
   return <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
 }
 
-export function EmptyState({ title, hint }: { title: string; hint?: string }) {
+export function EmptyState({ title, hint, icon: Icon, action }: {
+  title: string
+  hint?: string
+  icon?: React.ComponentType<{ size?: number; className?: string }>
+  action?: { label: string; onClick: () => void }
+}) {
   return (
     <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] text-center">
-      <div className="text-sm font-medium text-[var(--text-secondary)]">{title}</div>
+      {Icon && (
+        <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[var(--brand-soft)] flex items-center justify-center">
+          <Icon size={20} className="text-[var(--brand)]" />
+        </div>
+      )}
+      <div className="text-sm font-semibold text-[var(--text-secondary)]">{title}</div>
       {hint && <div className="text-sm text-[var(--text-muted)] mt-1">{hint}</div>}
+      {action && (
+        <button onClick={action.onClick} className="btn btn-outline mt-4 !text-xs !px-4 !py-2 mx-auto">
+          {action.label}
+        </button>
+      )}
     </div>
   )
 }

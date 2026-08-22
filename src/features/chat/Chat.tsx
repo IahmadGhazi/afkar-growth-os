@@ -273,10 +273,10 @@ export function Chat() {
                 const key = dayKey(m.created_at)
                 if (key !== lastDay) {
                   nodes.push(
-                    <div key={`day-${key}`} className="flex items-center gap-3 px-4 pt-3 pb-1">
-                      <div className="flex-1 h-px bg-[var(--hairline)]" />
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{dayLabel(key)}</span>
-                      <div className="flex-1 h-px bg-[var(--hairline)]" />
+                    <div key={`day-${key}`} className="flex items-center justify-center px-4 pt-4 pb-1">
+                      <span className="glass-strong rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] shadow-sm">
+                        {dayLabel(key)}
+                      </span>
                     </div>,
                   )
                   lastDay = key
@@ -327,7 +327,7 @@ export function Chat() {
               onKeyDown={handleKeyDown}
               rows={1}
               placeholder={`Message #team as ${currentUserId ? authorName(state.profiles, currentUserId) : '...'}`}
-              className="field resize-none flex-1 min-h-[44px] max-h-32"
+              className="field resize-none flex-1 min-h-[44px] max-h-32 focus:!shadow-[0_0_0_3px_rgba(210,154,12,0.12),0_4px_16px_rgba(210,154,12,0.08)] transition-shadow"
             />
             <button onClick={send} disabled={!draft.trim()} className="btn btn-primary h-[44px] shrink-0" aria-label="Send message">
               <Send size={16} />

@@ -80,9 +80,19 @@ export function Toaster() {
       {items.map((t) => (
         <div
           key={t.id}
-          className="glass-strong rounded-xl px-4 py-3 flex items-start gap-2.5 scale-in"
-          style={{ borderLeft: `3px solid ${styles[t.kind].border}` }}
+          className="glass-strong rounded-xl px-4 py-3 flex items-start gap-2.5 relative overflow-hidden"
+          style={{
+            borderLeft: `3px solid ${styles[t.kind].border}`,
+            animation: 'spring-pop 280ms cubic-bezier(0.34,1.56,0.64,1)',
+          }}
         >
+          <div
+            className="absolute bottom-0 left-0 h-[2px]"
+            style={{
+              backgroundColor: styles[t.kind].border,
+              animation: `toast-drain ${t.kind === 'error' ? 6500 : 4200}ms linear forwards`,
+            }}
+          />
           {styles[t.kind].icon}
           <div className="text-sm leading-snug text-[var(--text-primary)] flex-1">{t.message}</div>
           <button

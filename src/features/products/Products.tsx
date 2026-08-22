@@ -52,6 +52,29 @@ function scoreColor(score: number): string {
   return 'var(--text-muted)'
 }
 
+function ScoreDonut({ value }: { value: number }) {
+  const R = 14
+  const C = 2 * Math.PI * R
+  const pct = Math.min(1, Math.max(0, value / 10))
+  const color = scoreColor(value)
+  return (
+    <div className="relative w-9 h-9 shrink-0" title={`Score: ${value.toFixed(1)}/10`}>
+      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+        <circle cx="18" cy="18" r={R} fill="none" stroke="var(--track)" strokeWidth="3.5" />
+        <circle
+          cx="18" cy="18" r={R} fill="none" stroke={color} strokeWidth="3.5"
+          strokeLinecap="round"
+          strokeDasharray={`${pct * C} ${C}`}
+          className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-[10px] font-bold tabular-nums" style={{ color }}>{value.toFixed(1)}</span>
+      </div>
+    </div>
+  )
+}
+
 function hostOf(url: string | null): string | null {
   if (!url) return null
   try {
@@ -79,13 +102,7 @@ function ProductCard({
       <div className="flex items-start justify-between gap-2">
         <div className="font-semibold text-[var(--text-primary)] leading-snug">{product.name}</div>
         {score != null && !isKilled && (
-          <span
-            className="badge shrink-0"
-            style={{ backgroundColor: `color-mix(in srgb, ${scoreColor(score)} 15%, transparent)`, color: scoreColor(score) }}
-            title="Average of the scored dimensions"
-          >
-            {score.toFixed(1)}
-          </span>
+          <ScoreDonut value={score} />
         )}
       </div>
 

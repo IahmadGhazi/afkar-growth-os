@@ -37,7 +37,7 @@ export function NotificationsPanel({ open, onClose, onNavigate }: NotificationsP
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="glass-lg relative w-full max-w-md scale-in"
+        className="glass-lg relative w-full max-w-md spring-in" style={{ transformOrigin: 'top right' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 pt-4">

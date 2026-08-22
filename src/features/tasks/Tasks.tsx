@@ -204,7 +204,18 @@ export function Tasks() {
                   return (
                     <div
                       key={task.id}
-                      className={`glass-sm p-3 ${task.status === 'blocked' ? 'glass-danger' : 'glass-hover-brand'}`}
+                      className={`glass-sm p-3 relative overflow-hidden ${task.status === 'blocked' ? 'glass-danger' : 'glass-hover-brand'}`}
+                      style={{
+                        borderLeft: `4px solid ${
+                          task.priority === 'critical' ? 'var(--critical)' :
+                          task.priority === 'high' ? '#f2b04a' :
+                          task.priority === 'medium' ? 'var(--brand)' :
+                          'var(--track)'
+                        }`,
+                        ...(task.status === 'blocked' ? {
+                          background: 'repeating-linear-gradient(-45deg, transparent, transparent 6px, rgba(221,90,90,0.04) 6px, rgba(221,90,90,0.04) 12px)',
+                        } : {}),
+                      }}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <PriorityBadge priority={task.priority} />

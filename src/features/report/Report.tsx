@@ -184,7 +184,7 @@ export function Report() {
         </button>
       </div>
 
-      <div className="report-sheet bg-white rounded-2xl p-8 md:p-10 shadow-[0_1px_2px_rgba(22,26,34,0.06),0_24px_64px_rgba(22,26,34,0.12)] text-[#171a21]">
+      <div className="report-sheet bg-white rounded-2xl p-8 md:p-10 shadow-[0_1px_2px_rgba(22,26,34,0.06),0_24px_64px_rgba(22,26,34,0.12)] text-[#171a21] relative overflow-hidden border-t-[3px] border-t-[#c8920b]">
         {/* Masthead */}
         <div className="flex items-start justify-between border-b border-[rgba(22,26,34,0.12)] pb-6">
           <div>

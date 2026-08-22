@@ -34,15 +34,15 @@ export function Login() {
 
   return (
     <div className="min-h-[100dvh] grid place-items-center p-6">
-      <div className="w-full max-w-sm my-auto">
-        <div className="text-center mb-8">
+      <div className="w-full max-w-sm my-auto stagger">
+        <div className="text-center mb-8" style={{ '--i': 0 } as React.CSSProperties}>
           <img src="/logo.png" alt="AFKAR" className="h-14 w-auto mx-auto rounded-xl drop-shadow-[0_8px_24px_rgba(0,0,0,0.25)]" />
           <div className="mt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-muted)]">
             Growth OS
           </div>
         </div>
 
-        <form onSubmit={submit} className="glass-card p-6 space-y-3">
+        <form onSubmit={submit} className="glass-card p-6 space-y-3" style={{ '--i': 1 } as React.CSSProperties}>
           <div>
             <label htmlFor="login-email" className="text-xs font-semibold text-[var(--text-secondary)]">Email</label>
             <input
@@ -112,6 +112,7 @@ export function Login() {
             setNotice(null)
           }}
           className="mt-4 mx-auto flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--brand)] transition-colors"
+          style={{ '--i': 2 } as React.CSSProperties}
         >
           <ShieldCheck size={13} />
           {mode === 'setup' ? 'Back to sign in' : 'First-time setup — create the owner account'}

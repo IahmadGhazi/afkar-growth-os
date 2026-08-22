@@ -168,7 +168,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
                     : 'hover:text-[var(--brand)]'
                 }`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${connection?.connected ? 'bg-[var(--positive)]' : 'bg-[var(--text-muted)]'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${connection?.connected ? 'bg-[var(--positive)] breathing-dot' : 'bg-[var(--text-muted)]'}`} />
                 {source.label}
                 {connection?.connected && '· connected'}
               </button>
@@ -184,8 +184,8 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
       </section>
 
       {/* Hero metrics — the two numbers the whole business hangs on */}
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {['Revenue', 'ROAS'].map((heroName) => {
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 stagger">
+        {[...['Revenue', 'ROAS'].entries()].map(([idx, heroName]: [number, string]) => {
           const kpi = kpis.find((k) => k.name === heroName)
           if (!kpi) return null
           const format = unitFormats[kpi.unit ?? 'count']
@@ -195,7 +195,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
           const invert = kpi.direction === 'lower_better'
           const good = change == null ? true : invert ? !isUp : isUp
           return (
-            <div key={heroName} className="glass-card hover-lift p-5 sm:p-6">
+            <div key={heroName} className="glass-card hover-lift p-5 sm:p-6" style={{ '--i': idx } as React.CSSProperties}>
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-[var(--text-muted)]">{kpi.name}</div>
@@ -225,7 +225,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
           )
         })}
 
-        {/* Growth Score — one number for "how healthy is the machine" */}
+        {/* Growth Score — donut ring with animated fill + department bars */}
         {(() => {
           const scored = kpis.filter((k) => !isPlatformKpi(k.name))
           const points: Record<string, number> = { achieved: 1, on_track: 0.8, at_risk: 0.5, behind: 0.2 }
@@ -236,13 +236,33 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
           const depts = Object.keys(DEPARTMENT_LABELS)
             .map((d) => ({ dept: d, list: scored.filter((k) => k.department === d) }))
             .filter((g) => g.list.length > 0)
+
+          // Donut ring geometry
+          const R = 42
+          const C = 2 * Math.PI * R
+          const dash = (score / 100) * C
+
           return (
-            <div className="glass-card hover-lift p-6 flex flex-col">
-              <div className="flex items-baseline justify-between">
-                <div className="text-sm font-medium text-[var(--text-muted)]">Growth Score</div>
-                <div className="text-4xl font-extrabold tracking-tight" style={{ color: tone }}>
-                  {score}
-                  <span className="text-base font-semibold text-[var(--text-muted)]">/100</span>
+            <div className="glass-card hover-lift p-5 sm:p-6 flex flex-col md:col-span-1">
+              <div className="flex items-center gap-4">
+                {/* Donut ring */}
+                <div className="relative w-[88px] h-[88px] shrink-0">
+                  <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                    <circle cx="50" cy="50" r={R} fill="none" stroke="var(--track)" strokeWidth="7" />
+                    <circle
+                      cx="50" cy="50" r={R} fill="none" stroke={tone} strokeWidth="7"
+                      strokeLinecap="round"
+                      strokeDasharray={`${dash} ${C}`}
+                      className="transition-all duration-1000 ease-out"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-2xl font-extrabold tabular-nums" style={{ color: tone }}>{score}</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-[var(--text-primary)]">Growth Score</div>
+                  <div className="text-xs text-[var(--text-muted)] mt-0.5">out of 100</div>
                 </div>
               </div>
               <div className="mt-auto pt-4 space-y-1.5">
@@ -256,7 +276,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
                       />
                       <span className="text-[var(--text-secondary)] w-24 truncate">{departmentLabel(dept)}</span>
                       <div className="flex-1 h-1 rounded-full bg-[var(--track)] overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${s}%`, backgroundColor: s >= 80 ? 'var(--positive)' : s >= 60 ? 'var(--brand)' : s >= 40 ? 'var(--warning)' : 'var(--critical)' }} />
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${s}%`, backgroundColor: s >= 80 ? 'var(--positive)' : s >= 60 ? 'var(--brand)' : s >= 40 ? 'var(--warning)' : 'var(--critical)' }} />
                       </div>
                     </div>
                   )
