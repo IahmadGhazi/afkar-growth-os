@@ -170,6 +170,47 @@ export function Report() {
           <p className="text-sm leading-relaxed text-[#33373f]">{briefing.summary}</p>
         </div>
 
+        {/* Auto-generated review: derived from live KPI statuses */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+          {(() => {
+            const working = kpis.filter((k) => !isPlatformKpi(k.name) && (k.status === 'achieved' || k.status === 'on_track'))
+            const attention = kpis.filter((k) => !isPlatformKpi(k.name) && (k.status === 'at_risk' || k.status === 'behind'))
+            const fmt = (k: (typeof kpis)[number]) => {
+              const f = unitFormats[k.unit ?? 'count']
+              const change = k.previous != null ? changePct(k.current, k.previous) : null
+              return `${f(k.current)}${change ? ` (${change})` : ''}`
+            }
+            return (
+              <>
+                <div className="rounded-xl border border-[rgba(22,26,34,0.1)] p-4">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#0fa96c] mb-2">✓ What's working</div>
+                  {working.length === 0 ? (
+                    <p className="text-sm text-[#969eab]">Nothing on target yet this week.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {working.slice(0, 5).map((k) => (
+                        <li key={k.id} className="text-sm text-[#33373f]">• {k.name}: <strong>{fmt(k)}</strong></li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="rounded-xl border border-[rgba(22,26,34,0.1)] p-4">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#dd5a5a] mb-2">! Needs attention</div>
+                  {attention.length === 0 ? (
+                    <p className="text-sm text-[#969eab]">Everything is on track.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {attention.slice(0, 5).map((k) => (
+                        <li key={k.id} className="text-sm text-[#33373f]">• {k.name}: <strong>{fmt(k)}</strong> — target {unitFormats[k.unit ?? 'count'](k.target)}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </>
+            )
+          })()}
+        </div>
+
         {/* KPI grid */}
         <div className="py-4">
           <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#969eab] mb-3">

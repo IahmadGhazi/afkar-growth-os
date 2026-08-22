@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { LogIn, Loader2, UserPlus, ShieldCheck } from 'lucide-react'
-import { signIn, signUp } from '../../lib/auth'
+import { LogIn, Loader2, UserPlus, ShieldCheck, MailQuestion } from 'lucide-react'
+import { signIn, signUp, requestPasswordReset } from '../../lib/auth'
 
 export function Login() {
-  const [mode, setMode] = useState<'signin' | 'setup'>('signin')
+  const [mode, setMode] = useState<'signin' | 'setup' | 'forgot'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -19,6 +19,10 @@ export function Login() {
     if (mode === 'signin') {
       const { error: err } = await signIn(email.trim(), password)
       if (err) setError(err)
+    } else if (mode === 'forgot') {
+      const { error: err } = await requestPasswordReset(email.trim())
+      if (err) setError(err)
+      else setNotice('Reset link sent. Check your inbox (and spam once).')
     } else {
       const { error: err, needsConfirmation } = await signUp(email.trim(), password)
       if (err) setError(err)
@@ -53,16 +57,20 @@ export function Login() {
             />
           </div>
           <div>
-            <label htmlFor="login-password" className="text-xs font-semibold text-[var(--text-secondary)]">Password</label>
-            <input
-              id="login-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="field mt-1"
-              autoComplete={mode === 'setup' ? 'new-password' : 'current-password'}
-            />
+            <label htmlFor="login-password" className="text-xs font-semibold text-[var(--text-secondary)]">
+              {mode === 'forgot' ? 'We will email you a reset link' : 'Password'}
+            </label>
+            {mode !== 'forgot' && (
+              <input
+                id="login-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="field mt-1"
+                autoComplete={mode === 'setup' ? 'new-password' : 'current-password'}
+              />
+            )}
           </div>
 
           {error && (
@@ -76,10 +84,20 @@ export function Login() {
             </div>
           )}
 
-          <button type="submit" disabled={!email.trim() || !password || busy} className="btn btn-primary w-full">
-            {busy ? <Loader2 size={16} className="animate-spin" /> : mode === 'setup' ? <UserPlus size={16} /> : <LogIn size={16} />}
-            {busy ? 'Working…' : mode === 'setup' ? 'Create owner account' : 'Sign in'}
+          <button type="submit" disabled={!email.trim() || (mode !== 'forgot' && !password) || busy} className="btn btn-primary w-full">
+            {busy ? <Loader2 size={16} className="animate-spin" /> : mode === 'setup' ? <UserPlus size={16} /> : mode === 'forgot' ? <MailQuestion size={16} /> : <LogIn size={16} />}
+            {busy ? 'Working…' : mode === 'setup' ? 'Create owner account' : mode === 'forgot' ? 'Send reset link' : 'Sign in'}
           </button>
+
+          {mode === 'signin' && (
+            <button
+              type="button"
+              onClick={() => { setMode('forgot'); setError(null); setNotice(null) }}
+              className="w-full text-center text-[11px] text-[var(--text-muted)] hover:text-[var(--brand)]"
+            >
+              Forgot password?
+            </button>
+          )}
 
           <p className="text-[11px] text-[var(--text-muted)] text-center leading-relaxed">
             Team accounts only. Your email must match your team profile.
@@ -97,8 +115,7 @@ export function Login() {
         >
           <ShieldCheck size={13} />
           {mode === 'setup' ? 'Back to sign in' : 'First-time setup — create the owner account'}
-        </button>
-      </div>
+        </button>      </div>
     </div>
   )
 }

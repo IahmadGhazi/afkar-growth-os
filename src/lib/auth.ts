@@ -8,15 +8,21 @@ type Listener = () => void
 
 let status: AuthStatus = 'loading'
 let email: string | null = null
+let recovery = false
 // useSyncExternalStore requires getSnapshot to return a CACHED value:
 // a fresh object per call reads as "changed" every render -> infinite loop.
-let snapshot: { status: AuthStatus; email: string | null } = { status, email }
+let snapshot: { status: AuthStatus; email: string | null; recovery: boolean } = {
+  status,
+  email,
+  recovery,
+}
 const listeners = new Set<Listener>()
 
-function set(s: AuthStatus, e: string | null = null) {
+function set(s: AuthStatus, e: string | null = null, r = recovery) {
   status = s
   email = e
-  snapshot = { status, email }
+  recovery = r
+  snapshot = { status, email, recovery }
   listeners.forEach((l) => l())
 }
 
@@ -27,6 +33,12 @@ export function subscribe(listener: Listener) {
 
 export function getSnapshot() {
   return snapshot
+}
+
+/** The user arrived via a password-reset link: force the new-password form
+    once before the workspace opens. */
+export function clearRecovery() {
+  set('signed-in', email, false)
 }
 
 export function useAuth() {
@@ -52,14 +64,33 @@ export function initAuth() {
   })
 
   supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN' && session?.user) {
-      set('signed-in', session.user.email ?? null)
+    if (event === 'PASSWORD_RECOVERY' && session?.user) {
+      set('signed-in', session.user.email ?? null, true)
+      initStore()
+    } else if (event === 'SIGNED_IN' && session?.user) {
+      set('signed-in', session.user.email ?? null, false)
       initStore()
     } else if (event === 'SIGNED_OUT') {
       set('signed-out')
       resetForSignOut()
     }
   })
+}
+
+/** Send the password-reset email. Free tier sends ~2/hour - fine for a team. */
+export async function requestPasswordReset(email: string): Promise<{ error: string | null }> {
+  if (!supabase) return { error: 'Supabase is not configured.' }
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  })
+  return { error: error?.message ?? null }
+}
+
+export async function updatePassword(password: string): Promise<{ error: string | null }> {
+  if (!supabase) return { error: 'Supabase is not configured.' }
+  const { error } = await supabase.auth.updateUser({ password })
+  if (!error) clearRecovery()
+  return { error: error?.message ?? null }
 }
 
 export async function signIn(email: string, password: string): Promise<{ error: string | null }> {

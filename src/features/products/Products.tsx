@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   Plus,
+  Pencil,
   X,
   ArrowRight,
   Ban,
@@ -60,7 +61,13 @@ function hostOf(url: string | null): string | null {
   }
 }
 
-function ProductCard({ product }: { product: ProductCandidate }) {
+function ProductCard({
+  product,
+  onEdit,
+}: {
+  product: ProductCandidate
+  onEdit: (p: ProductCandidate) => void
+}) {
   const { state, actions } = useApp()
   const score = scoreOf(product)
   const host = hostOf(product.source_url)
@@ -111,6 +118,14 @@ function ProductCard({ product }: { product: ProductCandidate }) {
         <span>by {nameById(state, product.researcher_id)}</span>
         {!isKilled && (
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => onEdit(product)}
+              className="icon-btn w-7 h-7"
+              aria-label="Edit candidate"
+              title="Edit scores & details"
+            >
+              <Pencil size={12} />
+            </button>
             {next && (
               <button
                 onClick={() => actions.moveProduct(product.id, next)}
@@ -182,32 +197,81 @@ const emptyForm: FormState = {
 export function Products() {
   const { state, actions } = useApp()
   const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<ProductCandidate | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
 
   const products = state.products.filter((p) => p.client_id === state.currentClientId)
   const active = products.filter((p) => p.status !== 'killed')
   const killed = products.filter((p) => p.status === 'killed')
 
+  const openEdit = (p: ProductCandidate) => {
+    setEditing(p)
+    setForm({
+      name: p.name,
+      category: p.category ?? '',
+      sourceUrl: p.source_url ?? '',
+      competitor: p.competitor ?? '',
+      estimatedPrice: p.estimated_price?.toString() ?? '',
+      demandEvidence: p.demand_evidence ?? '',
+      demand: p.score_demand?.toString() ?? '',
+      competition: p.score_competition?.toString() ?? '',
+      margin: p.score_margin?.toString() ?? '',
+      creative: p.score_creative?.toString() ?? '',
+      brandFit: p.score_brand_fit?.toString() ?? '',
+      trend: p.score_trend?.toString() ?? '',
+    })
+    setShowForm(true)
+  }
+
+  const openEditOrCreate = () => {
+    if (editing) {
+      // reopening the edit form for the candidate already staged
+      setShowForm(true)
+      return
+    }
+    setEditing(null)
+    setForm(emptyForm)
+    setShowForm(true)
+  }
+
   const submit = () => {
     if (!form.name.trim()) return
     const num = (v: string) => (v.trim() === '' ? null : Math.max(0, Math.min(10, parseFloat(v))))
-    actions.addProduct({
-      name: form.name.trim(),
-      category: form.category.trim() || null,
-      sourceUrl: form.sourceUrl.trim() || null,
-      competitor: form.competitor.trim() || null,
-      estimatedPrice: form.estimatedPrice.trim() === '' ? null : parseFloat(form.estimatedPrice),
-      demandEvidence: form.demandEvidence.trim() || null,
-      notes: null,
-      scores: {
-        demand: num(form.demand),
-        competition: num(form.competition),
-        margin: num(form.margin),
-        creative: num(form.creative),
-        brandFit: num(form.brandFit),
-        trend: num(form.trend),
-      },
-    })
+    if (editing) {
+      actions.updateProduct(editing.id, {
+        name: form.name.trim(),
+        category: form.category.trim() || null,
+        source_url: form.sourceUrl.trim() || null,
+        competitor: form.competitor.trim() || null,
+        estimated_price: form.estimatedPrice.trim() === '' ? null : parseFloat(form.estimatedPrice),
+        demand_evidence: form.demandEvidence.trim() || null,
+        score_demand: num(form.demand),
+        score_competition: num(form.competition),
+        score_margin: num(form.margin),
+        score_creative: num(form.creative),
+        score_brand_fit: num(form.brandFit),
+        score_trend: num(form.trend),
+      })
+    } else {
+      actions.addProduct({
+        name: form.name.trim(),
+        category: form.category.trim() || null,
+        sourceUrl: form.sourceUrl.trim() || null,
+        competitor: form.competitor.trim() || null,
+        estimatedPrice: form.estimatedPrice.trim() === '' ? null : parseFloat(form.estimatedPrice),
+        demandEvidence: form.demandEvidence.trim() || null,
+        notes: null,
+        scores: {
+          demand: num(form.demand),
+          competition: num(form.competition),
+          margin: num(form.margin),
+          creative: num(form.creative),
+          brandFit: num(form.brandFit),
+          trend: num(form.trend),
+        },
+      })
+    }
+    setEditing(null)
     setForm(emptyForm)
     setShowForm(false)
   }
@@ -221,9 +285,12 @@ export function Products() {
             {active.length} live candidates · {killed.length} killed
           </div>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn btn-primary shrink-0">
+        <button
+          onClick={() => (showForm ? setShowForm(false) : openEditOrCreate())}
+          className="btn btn-primary shrink-0"
+        >
           {showForm ? <X size={16} /> : <Plus size={16} />}
-          <span className="hidden sm:inline">{showForm ? 'Close' : 'Add Candidate'}</span>
+          <span className="hidden sm:inline">{showForm ? 'Close' : editing ? 'Edit Candidate' : 'Add Candidate'}</span>
         </button>
       </div>
 
@@ -345,7 +412,7 @@ export function Products() {
               </SectionTitle>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {stageProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} />
+                  <ProductCard key={p.id} product={p} onEdit={openEdit} />
                 ))}
               </div>
             </section>
@@ -360,7 +427,7 @@ export function Products() {
           </summary>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
             {killed.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <ProductCard key={p.id} product={p} onEdit={openEdit} />
             ))}
           </div>
         </details>

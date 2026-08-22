@@ -87,6 +87,29 @@ export function uid(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
 }
 
+/** Notifications engine helper: builds a row for the bell. */
+function makeNotification(
+  id: string,
+  userId: string,
+  clientId: string,
+  type: string,
+  title: string,
+  body: string | null,
+  link: string | null,
+): Notification {
+  return {
+    id,
+    user_id: userId,
+    client_id: clientId,
+    type,
+    title,
+    body,
+    link,
+    is_read: false,
+    created_at: new Date().toISOString(),
+  }
+}
+
 /** THE TRUST LAYER. Every backend write goes through this proxy: a rejected
     promise is announced (toast), logged, and the store re-syncs from the
     server so the optimistic UI never keeps a lie on screen. */
@@ -291,7 +314,13 @@ export const actions = {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
-      backend.insertTask(task).catch((err) => console.error(err))
+      backend.insertTask(task).catch(() => undefined)
+      // Notifications engine: the assignee hears about it immediately.
+      if (input.assigneeId && input.assigneeId !== s.currentUserId) {
+        const n = makeNotification(uid('ntf'), input.assigneeId, clientId, 'task_assigned', `New task: ${input.title}`, input.dueDate ? `Due ${input.dueDate}` : null, '/my-work')
+        backend.insertNotification(n).catch(() => undefined)
+        return { ...s, tasks: [...s.tasks, task], notifications: [n, ...s.notifications] }
+      }
       return { ...s, tasks: [...s.tasks, task] }
     })
   },
@@ -313,30 +342,53 @@ export const actions = {
   moveTask(id: string, status: TaskStatus) {
     set((s) => {
       const now = new Date().toISOString()
-      return {
-        ...s,
-        tasks: s.tasks.map((task) => {
-          if (task.id !== id) return task
-          return {
-            ...task,
+      const task = s.tasks.find((t) => t.id === id)
+      let newNotifications: Notification[] | null = null
+      if (task) {
+        // Notifications engine: the right person hears about each transition.
+        const actor = s.currentUserId
+        const targets: Array<{ userId: string | null; type: string; title: string; link: string }> = []
+        if (status === 'review' && task.reviewer_id && task.reviewer_id !== actor)
+          targets.push({ userId: task.reviewer_id, type: 'task_review', title: `Review requested: ${task.title}`, link: '/tasks' })
+        if (status === 'done' && task.created_by && task.created_by !== actor)
+          targets.push({ userId: task.created_by, type: 'task_done', title: `Completed: ${task.title}`, link: '/tasks' })
+        if (targets.length > 0) {
+          newNotifications = targets
+            .filter((t): t is { userId: string; type: string; title: string; link: string } => !!t.userId)
+            .map((t) =>
+              makeNotification(uid('ntf'), t.userId, task.client_id, t.type, t.title, null, t.link),
+            )
+          if (newNotifications.length > 0)
+            newNotifications.forEach((n) => backend.insertNotification(n).catch(() => undefined))
+          else newNotifications = null
+        }
+        backend
+          .updateTask(id, {
             status,
             started_at: task.started_at ?? (status === 'in_progress' ? now : task.started_at),
             completed_at: status === 'done' ? now : task.completed_at,
             updated_at: now,
-          }
-        }),
+          })
+          .catch(() => undefined)
       }
+      const nextState: AppState = {
+        ...s,
+        tasks: s.tasks.map((t) =>
+          t.id !== id
+            ? t
+            : {
+                ...t,
+                status,
+                started_at: t.started_at ?? (status === 'in_progress' ? now : t.started_at),
+                completed_at: status === 'done' ? now : t.completed_at,
+                updated_at: now,
+              },
+        ),
+      }
+      return newNotifications
+        ? { ...nextState, notifications: [...newNotifications, ...nextState.notifications] }
+        : nextState
     })
-    const task = state.tasks.find((t) => t.id === id)
-    const now = new Date().toISOString()
-    backend
-      .updateTask(id, {
-        status,
-        started_at: task?.started_at ?? (status === 'in_progress' ? now : task?.started_at ?? null),
-        completed_at: status === 'done' ? now : task?.completed_at ?? null,
-        updated_at: now,
-      })
-      .catch((err) => console.error(err))
   },
 
   deleteTask(id: string) {
@@ -924,9 +976,72 @@ export const actions = {
       }
       backend.insertMetric(metric).catch(() => undefined)
       const rest = s.campaignMetrics.filter((m) => m.id !== metric.id)
-      return { ...s, campaignMetrics: [...rest, metric] }
+      const campaignMetrics = [...rest, metric]
+
+      // ---- AUTO-FEED: roll the day's numbers into platform + total KPIs.
+      // Ad-attributed only: store Revenue (organic Salla sales) is untouched,
+      // but Spend IS ad spend, so it feeds the blended Spend KPI directly -
+      // which also refreshes the derived ROAS automatically.
+      const byPlatform = new Map<CampaignPlatform, { spend: number; sales: number }>()
+      for (const m of campaignMetrics) {
+        if (m.client_id !== clientId || m.date !== input.date) continue
+        const plat = s.campaigns.find((c) => c.id === m.campaign_id)?.platform
+        if (!plat || plat === 'salla' || plat === 'other') continue
+        const cur = byPlatform.get(plat) ?? { spend: 0, sales: 0 }
+        cur.spend += m.spend
+        cur.sales += m.revenue
+        byPlatform.set(plat, cur)
+      }
+      const PLATFORM_KPI: Record<string, [string, string]> = {
+        snap_ads: ['kpi_snap_spend', 'kpi_snap_sales'],
+        google_ads: ['kpi_google_spend', 'kpi_google_sales'],
+        tiktok_ads: ['kpi_tiktok_spend', 'kpi_tiktok_sales'],
+      }
+      const feeds: Array<{ kpiId: string; value: number }> = []
+      for (const [plat, agg] of byPlatform) {
+        const ids = PLATFORM_KPI[plat]
+        if (ids) {
+          feeds.push({ kpiId: ids[0], value: agg.spend })
+          feeds.push({ kpiId: ids[1], value: agg.sales })
+        }
+      }
+      if (byPlatform.size > 0) {
+        feeds.push({
+          kpiId: 'kpi_spend',
+          value: [...byPlatform.values()].reduce((a, b) => a + b.spend, 0),
+        })
+      }
+
+      if (feeds.length > 0) {
+        const feedKpis = new Set(feeds.map((f) => f.kpiId))
+        let kpiSnapshots = s.kpiSnapshots.filter(
+          (snap) =>
+            !(
+              snap.client_id === clientId &&
+              snap.snapshot_date === input.date &&
+              feedKpis.has(snap.kpi_id)
+            ),
+        )
+        for (const f of feeds) {
+          const snap: KpiSnapshot = {
+            id: `snap_${f.kpiId}_${input.date}`,
+            kpi_id: f.kpiId,
+            client_id: clientId,
+            snapshot_date: input.date,
+            value: Math.round(f.value * 100) / 100,
+            source: `campaign:${input.campaignId}`,
+            notes: null,
+            created_at: new Date().toISOString(),
+          }
+          kpiSnapshots = [...kpiSnapshots, snap]
+          backend.insertSnapshot(snap).catch(() => undefined)
+        }
+        return { ...s, campaignMetrics, kpiSnapshots }
+      }
+
+      return { ...s, campaignMetrics }
     })
-    toast.success('Numbers logged.')
+    toast.success('Numbers logged. KPIs updated.')
   },
 
   addComment(taskId: string, content: string) {
