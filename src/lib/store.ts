@@ -981,10 +981,10 @@ export const actions = {
       const rest = s.campaignMetrics.filter((m) => m.id !== metric.id)
       const campaignMetrics = [...rest, metric]
 
-      // ---- AUTO-FEED: roll the day's numbers into platform + total KPIs.
-      // Ad-attributed only: store Revenue (organic Salla sales) is untouched,
-      // but Spend IS ad spend, so it feeds the blended Spend KPI directly -
-      // which also refreshes the derived ROAS automatically.
+      // ---- AUTO-FEED: roll the day's numbers into per-platform KPIs.
+      // Ad-attributed only: store Revenue (organic Salla sales) untouched,
+      // and blended kpi_spend stays human-owned so ROAS never explodes
+      // from a single day of campaign data.
       const byPlatform = new Map<CampaignPlatform, { spend: number; sales: number }>()
       for (const m of campaignMetrics) {
         if (m.client_id !== clientId || m.date !== input.date) continue
@@ -1000,6 +1000,11 @@ export const actions = {
         google_ads: ['kpi_google_spend', 'kpi_google_sales'],
         tiktok_ads: ['kpi_tiktok_spend', 'kpi_tiktok_sales'],
       }
+      // NOTE: we deliberately do NOT feed the blended kpi_spend here -
+      // that number is the business's weekly marketing budget, owned by
+      // the human. Campaign feeds only touch per-platform actuals, so
+      // derived ROAS (Sales/Spend) never explodes from a single day.
+
       const feeds: Array<{ kpiId: string; value: number }> = []
       for (const [plat, agg] of byPlatform) {
         const ids = PLATFORM_KPI[plat]
@@ -1008,41 +1013,30 @@ export const actions = {
           feeds.push({ kpiId: ids[1], value: agg.sales })
         }
       }
-      if (byPlatform.size > 0) {
-        feeds.push({
-          kpiId: 'kpi_spend',
-          value: [...byPlatform.values()].reduce((a, b) => a + b.spend, 0),
-        })
-      }
-
-      if (feeds.length > 0) {
-        const feedKpis = new Set(feeds.map((f) => f.kpiId))
-        let kpiSnapshots = s.kpiSnapshots.filter(
-          (snap) =>
-            !(
-              snap.client_id === clientId &&
-              snap.snapshot_date === input.date &&
-              feedKpis.has(snap.kpi_id)
-            ),
-        )
-        for (const f of feeds) {
-          const snap: KpiSnapshot = {
-            id: `snap_${f.kpiId}_${input.date}`,
-            kpi_id: f.kpiId,
-            client_id: clientId,
-            snapshot_date: input.date,
-            value: Math.round(f.value * 100) / 100,
-            source: `campaign:${input.campaignId}`,
-            notes: null,
-            created_at: new Date().toISOString(),
-          }
-          kpiSnapshots = [...kpiSnapshots, snap]
-          backend.insertSnapshot(snap).catch(() => undefined)
+      const feedKpis = new Set(feeds.map((f) => f.kpiId))
+      let kpiSnapshots = s.kpiSnapshots.filter(
+        (snap) =>
+          !(
+            snap.client_id === clientId &&
+            snap.snapshot_date === input.date &&
+            feedKpis.has(snap.kpi_id)
+          ),
+      )
+      for (const f of feeds) {
+        const snap: KpiSnapshot = {
+          id: `snap_${f.kpiId}_${input.date}`,
+          kpi_id: f.kpiId,
+          client_id: clientId,
+          snapshot_date: input.date,
+          value: Math.round(f.value * 100) / 100,
+          source: `campaign:${input.campaignId}`,
+          notes: null,
+          created_at: new Date().toISOString(),
         }
-        return { ...s, campaignMetrics, kpiSnapshots }
+        kpiSnapshots = [...kpiSnapshots, snap]
+        backend.insertSnapshot(snap).catch(() => undefined)
       }
-
-      return { ...s, campaignMetrics }
+      return { ...s, campaignMetrics, kpiSnapshots }
     })
     toast.success('Numbers logged. KPIs updated.')
   },

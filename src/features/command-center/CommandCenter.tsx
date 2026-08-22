@@ -184,7 +184,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
       </section>
 
       {/* Hero metrics — the two numbers the whole business hangs on */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {['Revenue', 'ROAS'].map((heroName) => {
           const kpi = kpis.find((k) => k.name === heroName)
           if (!kpi) return null
@@ -195,25 +195,26 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
           const invert = kpi.direction === 'lower_better'
           const good = change == null ? true : invert ? !isUp : isUp
           return (
-            <div key={heroName} className="glass-card hover-lift p-6 md:col-span-1">
+            <div key={heroName} className="glass-card hover-lift p-5 sm:p-6">
               <div className="flex items-start justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   <div className="text-sm font-medium text-[var(--text-muted)]">{kpi.name}</div>
-                  <div className="text-4xl font-extrabold tracking-tight text-[var(--text-primary)] mt-2">
+                  <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] mt-2 break-words">
                     {format(kpi.current)}
                   </div>
-                  <div className={`flex items-center gap-1 mt-3 text-sm font-medium ${
+                  <div className={`flex items-center gap-1 mt-3 text-xs sm:text-sm font-medium ${
                     change ? (good ? 'text-[var(--positive)]' : 'text-[var(--critical)]') : 'text-[var(--text-muted)]'
                   }`}>
                     {change ? (
                       <>
                         {change.startsWith('-') ? <TrendingDown size={15} /> : <TrendingUp size={15} />}
-                        {change} vs last week
+                        <span>{change}</span>
+                        <span className="hidden sm:inline">vs last week</span>
                       </>
                     ) : 'No history yet'}
                   </div>
                 </div>
-                <div className="w-[110px] shrink-0 self-end">
+                <div className="w-[90px] sm:w-[110px] shrink-0 self-end">
                   <Sparkline
                     data={kpiSeriesFor(state, kpi.id, clientId).map((d) => d.value)}
                     color={kpi.unit === 'ratio' ? '#f0c42e' : good ? '#19b87a' : '#dd5a5a'}
@@ -269,22 +270,28 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
       {/* Key metrics — everything else, dense and scannable by department */}
       <section>
         <SectionTitle>Business Performance</SectionTitle>
-        <div className="glass-card divide-y divide-[var(--hairline)]">
+        <div className="glass-card divide-y divide-[var(--hairline)] overflow-hidden">
           {statCards
             .filter((s) => s.name !== 'Revenue' && s.name !== 'ROAS')
             .map((stat) => (
-              <div key={stat.name} className="flex items-center gap-4 px-5 py-3.5 hover:bg-[var(--hover)] transition-colors first:rounded-t-[18px] last:rounded-b-[18px]">
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm text-[var(--text-secondary)] truncate">{stat.name}</div>
+              <div key={stat.name} className="px-4 sm:px-5 py-3 hover:bg-[var(--hover)] transition-colors first:rounded-t-[18px] last:rounded-b-[18px]">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm text-[var(--text-secondary)] truncate">{stat.name}</div>
+                  </div>
+                  <div className="hidden md:block w-[90px] shrink-0">
+                    <Sparkline data={stat.series.map((d) => d.value)} color={stat.good ? '#19b87a' : stat.change ? '#dd5a5a' : '#d29a0c'} width={90} height={26} />
+                  </div>
+                  <div className="w-24 sm:w-28 text-right text-base sm:text-lg font-bold text-[var(--text-primary)] tabular-nums shrink-0">{stat.value}</div>
+                  <div className={`w-14 sm:w-20 text-right text-xs font-medium shrink-0 ${
+                    stat.change ? (stat.good ? 'text-[var(--positive)]' : 'text-[var(--critical)]') : 'text-[var(--text-muted)]'
+                  }`}>
+                    {stat.change ?? '—'}
+                  </div>
                 </div>
-                <div className="hidden sm:block w-[90px]">
-                  <Sparkline data={stat.series.map((d) => d.value)} color={stat.good ? '#19b87a' : stat.change ? '#dd5a5a' : '#d29a0c'} width={90} height={26} />
-                </div>
-                <div className="w-28 text-right text-lg font-bold text-[var(--text-primary)] tabular-nums">{stat.value}</div>
-                <div className={`w-20 text-right text-xs font-medium ${
-                  stat.change ? (stat.good ? 'text-[var(--positive)]' : 'text-[var(--critical)]') : 'text-[var(--text-muted)]'
-                }`}>
-                  {stat.change ?? '—'}
+                {/* mobile: sparkline under the name */}
+                <div className="sm:hidden mt-1.5 h-[22px] w-full max-w-[180px] opacity-80">
+                  <Sparkline data={stat.series.map((d) => d.value)} color={stat.good ? '#19b87a' : stat.change ? '#dd5a5a' : '#d29a0c'} width={160} height={22} />
                 </div>
               </div>
             ))}

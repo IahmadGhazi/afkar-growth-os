@@ -240,7 +240,7 @@ export function Report() {
           <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#969eab] mb-3">
             Platform Results — Spend &amp; Sales
           </div>
-          <div className="rounded-xl border border-[rgba(22,26,34,0.1)] overflow-hidden">
+          <div className="rounded-xl border border-[rgba(22,26,34,0.1)] overflow-hidden overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[rgba(22,26,34,0.05)] text-left text-xs text-[#565d6b]">
