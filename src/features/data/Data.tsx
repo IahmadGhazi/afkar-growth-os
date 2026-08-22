@@ -24,6 +24,7 @@ import {
 } from '../../lib/integrations/sheets'
 import { SectionTitle } from '../../components/shared/ui'
 import { formatShort } from '../../lib/date'
+import { IntegrationsPanel } from './IntegrationsPanel'
 import type { DataSourceId } from '../../types/database'
 
 function ConnectionCard({ sourceId }: { sourceId: DataSourceId }) {
@@ -436,7 +437,13 @@ export function Data() {
         <span>{client?.name ?? 'Client'} · {connectedCount}/{apiSources.length} API sources connected</span>
       </div>
 
-      {/* Connections */}
+      {/* Live platform integrations */}
+      <section>
+        <SectionTitle>Platform Integrations</SectionTitle>
+        <IntegrationsPanel />
+      </section>
+
+      {/* Manual connections (demo mode) */}
       <section>
         <SectionTitle>Data Sources</SectionTitle>
         <div className="text-sm text-[var(--text-muted)] mb-4">

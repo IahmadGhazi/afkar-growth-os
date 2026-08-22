@@ -23,6 +23,7 @@ import type {
   CampaignMetric,
   CampaignPlatform,
   TaskComment,
+  ClientReportNote,
 } from '../types/database'
 import type { AppState } from '../data/seed'
 import { todayISO } from './date'
@@ -63,6 +64,7 @@ function emptyState(): AppState {
     campaigns: [],
     campaignMetrics: [],
     taskComments: [],
+    reportNotes: [],
     currentUserId: null,
     currentClientId: null,
     ready: false,
@@ -169,6 +171,7 @@ async function refreshFromServer() {
       campaigns: data.campaigns,
       campaignMetrics: data.campaignMetrics,
       taskComments: data.taskComments,
+      reportNotes: data.reportNotes,
     }))
     sweepOverdue()
   } catch (err) {
@@ -213,6 +216,7 @@ async function bootstrap() {
         campaigns: data.campaigns,
         campaignMetrics: data.campaignMetrics,
         taskComments: data.taskComments,
+        reportNotes: data.reportNotes,
       }
       let currentUserId: string | null = null
       if (authUser) {
@@ -1055,6 +1059,84 @@ export const actions = {
       backend.insertComment(comment).catch(() => undefined)
       return { ...s, taskComments: [...s.taskComments, comment] }
     })
+  },
+
+  /** Upsert the human narrative layer for one report week. */
+  saveReportNote(input: {
+    weekStart: string
+    weekEnd: string
+    execSummary?: string | null
+    whatWorked?: string | null
+    whatDidnt?: string | null
+    nextWeek?: string | null
+  }) {
+    set((s) => {
+      const clientId = s.currentClientId
+      if (!clientId) return s
+      const existing = s.reportNotes.find(
+        (r) => r.client_id === clientId && r.week_start === input.weekStart,
+      )
+      const row: ClientReportNote = {
+        id: existing?.id ?? uid('rep'),
+        client_id: clientId,
+        week_start: input.weekStart,
+        week_end: input.weekEnd,
+        exec_summary: input.execSummary ?? null,
+        what_worked: input.whatWorked ?? null,
+        what_didnt: input.whatDidnt ?? null,
+        next_week: input.nextWeek ?? null,
+        created_by: s.currentUserId,
+        created_at: existing?.created_at ?? new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      backend.insertReportNote(row).catch(() => undefined)
+      return {
+        ...s,
+        reportNotes: [...s.reportNotes.filter((r) => r.id !== row.id), row],
+      }
+    })
+    toast.success('Report notes saved.')
+  },
+
+  clearReportNote(weekStart: string) {
+    set((s) => ({
+      ...s,
+      reportNotes: s.reportNotes.filter((r) => !(r.client_id === s.currentClientId && r.week_start === weekStart)),
+    }))
+  },
+
+  /** Slack-style emoji reaction toggle. */
+  toggleReaction(messageId: string, emoji: string) {
+    set((s) => {
+      const me = s.currentUserId
+      if (!me) return s
+      const messages = s.messages.map((m) => {
+        if (m.id !== messageId) return m
+        const reactions = { ...(m.reactions ?? {}) }
+        const list = reactions[emoji] ?? []
+        reactions[emoji] = list.includes(me) ? list.filter((u) => u !== me) : [...list, me]
+        if (reactions[emoji].length === 0) delete reactions[emoji]
+        return { ...m, reactions }
+      })
+      const updated = messages.find((m) => m.id === messageId)
+      if (updated) backend.patchMessage(messageId, { reactions: updated.reactions ?? {} }).catch(() => undefined)
+      return { ...s, messages }
+    })
+  },
+
+  editMessage(messageId: string, body: string) {
+    set((s) => ({
+      ...s,
+      messages: s.messages.map((m) =>
+        m.id === messageId ? { ...m, body: body.trim(), edited_at: new Date().toISOString() } : m,
+      ),
+    }))
+    backend.patchMessage(messageId, { body: body.trim(), edited_at: new Date().toISOString() }).catch(() => undefined)
+  },
+
+  deleteMessage(messageId: string) {
+    set((s) => ({ ...s, messages: s.messages.filter((m) => m.id !== messageId) }))
+    backend.deleteMessage(messageId).catch(() => undefined)
   },
 
   resetAll() {

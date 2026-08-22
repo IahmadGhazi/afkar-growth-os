@@ -1,4 +1,5 @@
-import { Printer } from 'lucide-react'
+import { useState } from 'react'
+import { Printer, Pencil, RotateCcw, Save, X } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import {
   currentClient,
@@ -14,6 +15,7 @@ import {
   isPlatformKpi,
   canAccess,
 } from '../../lib/selectors'
+import { startOfWeekISO, endOfWeekISO } from '../../lib/date'
 import { TrendChart, type TrendDatum } from '../../components/shared/charts'
 import { buildBriefing, kpiSeriesFor } from '../../lib/insights'
 import { formatFull } from '../../lib/date'
@@ -78,8 +80,10 @@ function TrendBlock({
 }
 
 export function Report() {
-  const { state } = useApp()
+  const { state, actions } = useApp()
   const clientId = state.currentClientId
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [notesDraft, setNotesDraft] = useState({ exec_summary: '', what_worked: '', what_didnt: '', next_week: '' })
 
   if (!canAccess(state, 'report')) {
     return (
@@ -98,6 +102,44 @@ export function Report() {
   const briefing = buildBriefing(state, clientId)
   const platform = platformResults(state, clientId)
 
+  // Human narrative layer for this week (falls back to auto when unset)
+  const weekStartISO = objective?.week_start ?? startOfWeekISO()
+  const weekEndISO = objective?.week_end ?? endOfWeekISO()
+  const note = state.reportNotes.find(
+    (r) => r.client_id === clientId && r.week_start === weekStartISO,
+  )
+  const execSummaryText = note?.exec_summary || briefing.summary
+  const whatWorkedAuto = kpis.filter((k) => !isPlatformKpi(k.name) && (k.status === 'achieved' || k.status === 'on_track'))
+  const attentionAuto = kpis.filter((k) => !isPlatformKpi(k.name) && (k.status === 'at_risk' || k.status === 'behind'))
+  const fmtVal = (k: (typeof kpis)[number]) => {
+    const f = unitFormats[k.unit ?? 'count']
+    const change = k.previous != null ? changePct(k.current, k.previous) : null
+    return `${f(k.current)}${change ? ` (${change})` : ''}`
+  }
+
+  const startEditNotes = () => {
+    setNotesDraft({
+      exec_summary: note?.exec_summary ?? briefing.summary,
+      what_worked: note?.what_worked ?? whatWorkedAuto.map((k) => `• ${k.name}: ${fmtVal(k)}`).join('\n'),
+      what_didnt: note?.what_didnt ?? attentionAuto.map((k) => `• ${k.name}: ${fmtVal(k)} — target ${unitFormats[k.unit ?? 'count'](k.target)}`).join('\n'),
+      next_week: note?.next_week ?? '',
+    })
+    setEditingNotes(true)
+  }
+
+  const saveNotes = () => {
+    actions.saveReportNote({
+      weekStart: weekStartISO,
+      weekEnd: weekEndISO,
+      ...notesDraft,
+    })
+    setEditingNotes(false)
+  }
+
+  const resetToAuto = () => {
+    if (note) actions.clearReportNote(weekStartISO)
+    setEditingNotes(false)
+  }
   const period = objective
     ? `${formatFull(objective.week_start)} — ${formatFull(objective.week_end)}`
     : formatFull(new Date().toISOString())
@@ -162,12 +204,62 @@ export function Report() {
           </div>
         </div>
 
-        {/* AI Briefing */}
+        {/* Management Summary — auto + human narrative layer */}
         <div className="py-6">
-          <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#c8920b] mb-2">
-            Management Summary
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#c8920b]">
+              Management Summary
+            </div>
+            {!editingNotes ? (
+              <button onClick={startEditNotes} className="btn btn-outline !text-xs !px-3 !py-1.5 no-print">
+                <Pencil size={12} /> Edit notes
+              </button>
+            ) : (
+              <div className="flex gap-2 no-print">
+                <button onClick={resetToAuto} className="btn btn-outline !text-xs !px-3 !py-1.5" title="Discard manual notes, restore auto">
+                  <RotateCcw size={12} /> Reset to auto
+                </button>
+                <button onClick={() => setEditingNotes(false)} className="btn btn-outline !text-xs !px-3 !py-1.5">
+                  <X size={12} /> Cancel
+                </button>
+                <button onClick={saveNotes} className="btn btn-primary !text-xs !px-3 !py-1.5">
+                  <Save size={12} /> Save
+                </button>
+              </div>
+            )}
           </div>
-          <p className="text-sm leading-relaxed text-[#33373f]">{briefing.summary}</p>
+
+          {editingNotes ? (
+            <div className="space-y-3 glass-card p-5 no-print">
+              {([
+                ['exec_summary', 'Executive summary'],
+                ['what_worked', "✓ What's working"],
+                ['what_didnt', '! Needs attention'],
+                ['next_week', 'Next week focus'],
+              ] as const).map(([key, label]) => (
+                <div key={key}>
+                  <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#969eab]">{label}</label>
+                  <textarea
+                    value={notesDraft[key]}
+                    onChange={(e) => setNotesDraft({ ...notesDraft, [key]: e.target.value })}
+                    rows={key === 'exec_summary' ? 3 : 2}
+                    className="field mt-1 resize-y text-sm"
+                  />
+                </div>
+              ))}
+              <p className="text-[11px] text-[#969eab]">Saved to this week's report. Numbers stay live from your data.</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm leading-relaxed text-[#33373f]">{execSummaryText}</p>
+              {(note?.next_week || objective?.title) && (
+                <p className="mt-2 text-sm text-[#33373f]">
+                  <strong className="text-[#171a21]">Next week: </strong>
+                  {note?.next_week || objective?.title}
+                </p>
+              )}
+            </>
+          )}
         </div>
 
         {/* Auto-generated review: derived from live KPI statuses */}

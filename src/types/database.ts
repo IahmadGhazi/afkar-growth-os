@@ -187,6 +187,32 @@ export interface ChatMessage {
   client_id: string
   author_id: string
   body: string
+  /** emoji -> array of author ids who reacted with it */
+  reactions?: Record<string, string[]> | null
+  edited_at?: string | null
+  created_at: string
+}
+
+export interface ClientReportNote {
+  id: string
+  client_id: string
+  week_start: string
+  week_end: string
+  exec_summary: string | null
+  what_worked: string | null
+  what_didnt: string | null
+  next_week: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PlatformAccount {
+  id: string
+  client_id: string
+  platform: 'google_ads' | 'tiktok_ads' | 'snap_ads' | 'salla'
+  account_id: string
+  label: string | null
   created_at: string
 }
 

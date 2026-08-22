@@ -19,6 +19,7 @@ import type {
   TaskComment,
   WeeklyObjective,
   KeyResult,
+  ClientReportNote,
 } from '../types/database'
 
 export const backendAvailable = hasSupabaseEnv && supabase != null
@@ -65,7 +66,7 @@ export const backend = {
   available: backendAvailable,
 
   async loadAll() {
-    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages, products, campaigns, campaignMetrics, taskComments] =
+    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages, reportNotes, products, campaigns, campaignMetrics, taskComments] =
       await Promise.all([
         selectAllSafe<Organization>('organizations'),
         selectAllSafe<Client>('clients'),
@@ -82,6 +83,7 @@ export const backend = {
         selectAllSafe<Notification>('notifications'),
         selectAllSafe<ActivityLog>('activity_logs'),
         selectAllSafe<ChatMessage>('messages', 'created_at'),
+        selectAllSafe<ClientReportNote>('client_reports', 'week_start'),
         selectAllSafe<ProductCandidate>('product_candidates'),
         selectAllSafe<Campaign>('campaigns'),
         selectAllSafe<CampaignMetric>('campaign_metrics', 'date'),
@@ -103,6 +105,7 @@ export const backend = {
       notifications,
       activity,
       messages,
+      reportNotes,
       products,
       campaigns,
       campaignMetrics,
@@ -168,4 +171,9 @@ export const backend = {
   insertMetric: (row: CampaignMetric) => upsert('campaign_metrics', row),
 
   insertComment: (row: TaskComment) => upsert('task_comments', row),
+
+  insertReportNote: (row: ClientReportNote) => upsert('client_reports', row),
+
+  patchMessage: (id: string, patch: Record<string, unknown>) => updateById('messages', id, patch),
+  deleteMessage: (id: string) => remove('messages', id),
 }

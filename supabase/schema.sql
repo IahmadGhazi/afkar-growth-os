@@ -281,6 +281,29 @@ create table if not exists public.task_comments (
   created_at timestamptz not null default now()
 );
 
+-- ---------- CLIENT REPORTS (auto data + human narrative layer) ----------
+create table if not exists public.client_reports (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  week_start date not null,
+  week_end date not null,
+  exec_summary text,
+  what_worked text,
+  what_didnt text,
+  next_week text,
+  created_by text references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Chat upgrades: emoji reactions + edit tracking
+alter table public.messages add column if not exists reactions jsonb not null default '{}'::jsonb;
+alter table public.messages add column if not exists edited_at timestamptz;
+
+do $$ begin
+  execute 'create unique index if not exists client_reports_unique_week on public.client_reports (client_id, week_start)';
+exception when others then null; end $$;
+
 -- ---------- CONNECTIONS ----------
 create table if not exists public.connections (
   id text primary key,
@@ -483,6 +506,32 @@ exception when others then null; end $$;
 
 do $$ begin
   create policy "team full access sync_runs" on public.sync_runs for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+
+-- client_reports policies (new table, hardened pattern)
+do $$ begin
+  drop policy if exists "anon full access client_reports" on public.client_reports;
+exception when others then null; end $$;
+do $$ begin
+  create policy "team full access client_reports" on public.client_reports for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+
+-- platform_accounts policies (new table, hardened pattern)
+create table if not exists public.platform_accounts (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  platform text not null check (platform in ('google_ads','tiktok_ads','snap_ads','salla')),
+  account_id text not null,
+  label text,
+  created_at timestamptz not null default now(),
+  unique (client_id, platform, account_id)
+);
+alter table public.platform_accounts enable row level security;
+do $$ begin
+  drop policy if exists "anon full access platform_accounts" on public.platform_accounts;
+exception when others then null; end $$;
+do $$ begin
+  create policy "team full access platform_accounts" on public.platform_accounts for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
 
 -- ============================================================

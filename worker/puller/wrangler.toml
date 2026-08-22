@@ -1,0 +1,20 @@
+name = "afkar-ads-puller"
+main = "src/index.ts"
+compatibility_date = "2026-08-18"
+
+# Cron: every 3 hours pulls yesterday's insights into kpi_snapshots.
+workers_dev = true
+
+[triggers]
+crons = ["0 */3 * * *"]
+
+# Secrets (set with `wrangler secret put`, never committed):
+# SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+# GOOGLE_ADS_CLIENT_ID, GOOGLE_ADS_CLIENT_SECRET, GOOGLE_ADS_DEVELOPER_TOKEN,
+# GOOGLE_ADS_REFRESH_TOKEN, GOOGLE_ADS_CUSTOMER_ID,
+# TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_ADVERTISER_ID,
+# SNAP_CLIENT_ID, SNAP_CLIENT_SECRET, SNAP_REFRESH_TOKEN, SNAP_AD_ACCOUNT_ID,
+# SALLA_CLIENT_ID, SALLA_CLIENT_SECRET, SALLA_REFRESH_TOKEN, SALLA_STORE_ID,
+# PULLER_TOKEN
+[vars]
+# none - everything sensitive lives in secrets

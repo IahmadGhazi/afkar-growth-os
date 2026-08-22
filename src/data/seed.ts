@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   Client,
   ClientAssignment,
+  ClientReportNote,
   Connection,
   KpiDefinition,
   KpiSnapshot,
@@ -41,6 +42,7 @@ export interface AppState {
   campaigns: Campaign[]
   campaignMetrics: CampaignMetric[]
   taskComments: TaskComment[]
+  reportNotes: ClientReportNote[]
   currentUserId: string | null
   currentClientId: string | null
   /** False until the first backend bootstrap resolves; the shell shows a
