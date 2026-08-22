@@ -202,7 +202,12 @@ async function bootstrap() {
           backend.updateProfile(mine.id, { auth_user_id: authUser.id }).catch(() => undefined)
         }
       }
-      return { ...next, currentUserId }
+      const client = next.clients[0] ?? null
+      return {
+        ...next,
+        currentUserId,
+        currentClientId: client?.id ?? null,
+      }
     })
   } catch (err) {
     console.error('bootstrap failed', err)

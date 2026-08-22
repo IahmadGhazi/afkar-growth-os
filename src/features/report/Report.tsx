@@ -12,6 +12,7 @@ import {
   changePct,
   platformResults,
   isPlatformKpi,
+  canAccess,
 } from '../../lib/selectors'
 import { TrendChart, type TrendDatum } from '../../components/shared/charts'
 import { buildBriefing, kpiSeriesFor } from '../../lib/insights'
@@ -78,8 +79,18 @@ function TrendBlock({
 
 export function Report() {
   const { state } = useApp()
-  const client = currentClient(state)
   const clientId = state.currentClientId
+
+  if (!canAccess(state, 'report')) {
+    return (
+      <div className="glass-card p-8 text-center">
+        <div className="text-sm font-medium text-[var(--text-secondary)]">Client report is admin/media only</div>
+        <div className="text-sm text-[var(--text-muted)] mt-1">Ask Ibrahim if you need the numbers deck.</div>
+      </div>
+    )
+  }
+
+  const client = currentClient(state)
   const tasks = tasksForClient(state, clientId)
   const kpis = kpisForClient(state, clientId)
   const objective = activeObjective(state, clientId)

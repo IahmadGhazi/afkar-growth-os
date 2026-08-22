@@ -33,6 +33,8 @@ function MemberCard({ member }: { member: Profile }) {
   const { state, actions } = useApp()
   const stats = teamMemberStats(state, member)
   const isViewing = state.currentUserId === member.id
+  const me = state.profiles.find((p) => p.id === state.currentUserId)
+  const canImpersonate = me?.role === 'super_admin' || me?.role === 'account_manager'
   return (
     <div className={`glass-card hover-lift p-5 ${isViewing ? 'ring-2 ring-[var(--brand)]' : ''}`}>
       <div className="flex items-center gap-3 mb-4">
@@ -80,13 +82,15 @@ function MemberCard({ member }: { member: Profile }) {
         )}
       </div>
 
-      <button
-        onClick={() => actions.setCurrentUser(member.id)}
-        className={`btn w-full mt-4 ${isViewing ? 'btn-outline' : 'btn-primary'}`}
-      >
-        <Eye size={15} />
-        {isViewing ? 'Currently viewing' : `View as ${member.full_name}`}
-      </button>
+      {canImpersonate && (
+        <button
+          onClick={() => actions.setCurrentUser(member.id)}
+          className={`btn w-full mt-4 ${isViewing ? 'btn-outline' : 'btn-primary'}`}
+        >
+          <Eye size={15} />
+          {isViewing ? 'Currently viewing' : `View as ${member.full_name}`}
+        </button>
+      )}
     </div>
   )
 }

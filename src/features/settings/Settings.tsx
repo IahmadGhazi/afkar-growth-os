@@ -136,9 +136,11 @@ export function Settings() {
                   <span className="text-sm font-medium text-[var(--text-primary)]">
                     {state.organization.name}
                   </span>
-                  <button onClick={() => setEditingName(true)} className="icon-btn" aria-label="Rename organization">
-                    <Pencil size={13} />
-                  </button>
+                  {isAdmin && (
+                    <button onClick={() => setEditingName(true)} className="icon-btn" aria-label="Rename organization">
+                      <Pencil size={13} />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
