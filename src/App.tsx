@@ -41,49 +41,33 @@ const pageTitles: Record<string, string> = {
 function App() {
   const { state } = useApp()
   const auth = useAuth()
-  // Role-based landing: admins open on the Command Center, everyone else
-  // opens on their own My Work - the view that matters to them first.
-  const [currentPath, setCurrentPath] = useState<string>(() => {
-    try {
-      const st = JSON.parse(localStorage.getItem('afkar-last-path') ?? 'null') as { path: string; role: string } | null
-      return st?.path ?? '/'
-    } catch {
-      return '/'
-    }
+
+  // URL-driven navigation: real endpoints (/tasks, /chat, /campaigns...).
+  // Refresh returns you to exactly where you were. Browser back/forward work.
+  const [currentPath, setCurrentPath] = useState(() => {
+    const path = window.location.pathname.replace(/\/+$/, '') || '/'
+    return pageTitles[path] ? path : '/'
   })
-  const [landingResolved, setLandingResolved] = useState(false)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
+  // Keep URL in sync when navigating via sidebar/buttons
   useEffect(() => {
-    if (auth.status !== 'signed-in' || !state.ready || landingResolved) return
-    const me = state.profiles.find((p) => p.id === state.currentUserId)
-    const adminish = me?.role === 'super_admin' || me?.role === 'account_manager'
-    const last = (() => {
-      try {
-        return JSON.parse(localStorage.getItem('afkar-last-path') ?? 'null') as { role: string } | null
-      } catch {
-        return null
-      }
-    })()
-    // First visit of this role in this browser -> land them right.
-    if (!last || last.role !== (me?.role ?? '')) {
-      const target = adminish ? '/' : '/my-work'
-      setCurrentPath(target)
-      localStorage.setItem('afkar-last-path', JSON.stringify({ path: target, role: me?.role ?? '' }))
-    }
-    setLandingResolved(true)
-  }, [auth.status, state.ready, landingResolved])
-
-  useEffect(() => {
-    try {
-      const me = state.profiles.find((p) => p.id === state.currentUserId)
-      localStorage.setItem('afkar-last-path', JSON.stringify({ path: currentPath, role: me?.role ?? '' }))
-    } catch {
-      // ignore
+    if (window.location.pathname !== currentPath) {
+      window.history.pushState({}, '', currentPath)
     }
   }, [currentPath])
+
+  // Browser back/forward buttons
+  useEffect(() => {
+    const onPop = () => {
+      const path = window.location.pathname.replace(/\/+$/, '') || '/'
+      setCurrentPath(pageTitles[path] ? path : '/')
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -99,6 +83,7 @@ function App() {
 
   // Close mobile nav + scroll to top on navigation
   const navigate = (path: string) => {
+    window.history.pushState({}, '', path)
     setCurrentPath(path)
     setMobileNavOpen(false)
   }
@@ -106,7 +91,7 @@ function App() {
   const renderPage = () => {
     switch (currentPath) {
       case '/':
-        return <CommandCenter onNavigate={setCurrentPath} />
+        return <CommandCenter onNavigate={navigate} />
       case '/my-work':
         return <MyWork />
       case '/tasks':
@@ -130,7 +115,7 @@ function App() {
       case '/settings':
         return <Settings />
       default:
-        return <CommandCenter onNavigate={setCurrentPath} />
+        return <CommandCenter onNavigate={navigate} />
     }
   }
 
@@ -166,7 +151,7 @@ function App() {
       <div className="hidden lg:block shrink-0">
         <Sidebar
           currentPath={currentPath}
-          onNavigate={setCurrentPath}
+          onNavigate={navigate}
           onOpenNotifications={() => setNotificationsOpen(true)}
         />
       </div>
@@ -228,7 +213,7 @@ function App() {
       <NotificationsPanel
         open={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
-        onNavigate={setCurrentPath}
+        onNavigate={navigate}
       />
       <Toaster />
     </div>
