@@ -838,6 +838,14 @@ export const actions = {
         created_at: new Date().toISOString(),
       }
       backend.insertMessage(message).catch(() => undefined)
+      // INSTANT DELIVERY: broadcast to all connected devices immediately.
+      if (chatChannel) {
+        chatChannel.send({
+          type: 'broadcast',
+          event: 'new-message',
+          payload: message as unknown as Record<string, unknown>,
+        })
+      }
       return { ...s, messages: [...s.messages, message] }
     })
   },
@@ -1205,6 +1213,7 @@ export function resetForSignOut() {
 
 let liveSyncStarted = false
 let liveChannel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null
+let chatChannel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null
 
 let typingUsers: Array<{ name: string; role: string }> = []
 
@@ -1242,6 +1251,20 @@ export function subscribeTyping(cb: (users: Array<{ name: string; role: string }
 function startLiveSync() {
   if (!supabase || liveSyncStarted) return
   liveSyncStarted = true
+
+  // Dedicated chat channel: instant message delivery via broadcast.
+  chatChannel = supabase.channel('afkar-chat')
+  chatChannel.on('broadcast', { event: 'new-message' }, (payload) => {
+    const msg = payload.payload as unknown as ChatMessage
+    if (!msg?.id) return
+    set((s) => {
+      // Deduplicate: skip if already present (from postgres_changes refresh)
+      if (s.messages.some((m) => m.id === msg.id)) return s
+      return { ...s, messages: [...s.messages, msg] }
+    })
+  })
+  chatChannel.subscribe()
+
   liveChannel = supabase.channel('afkar-live-sync', {
     config: { broadcast: { self: false } },
   })

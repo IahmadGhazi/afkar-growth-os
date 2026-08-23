@@ -6,6 +6,23 @@ import type { ChatMessage, Profile } from '../../types/database'
 
 const QUICK_REACTIONS = ['👍', '🎉', '❤️', '😄', '👀']
 
+/** Unique identity color per department. Instant visual recognition:
+    you know who's who before reading a single name. */
+const DEPARTMENT_STYLE: Record<string, { grad: string; text: string; name: string }> = {
+  super_admin:      { grad: 'from-[#f0c42e] to-[#d29a0c]', text: '#1a1405', name: '#d29a0c' },
+  account_manager:  { grad: 'from-[#f0c42e] to-[#b8930a]', text: '#1a1405', name: '#c9950b' },
+  seo:              { grad: 'from-[#34d399] to-[#0fa96c]', text: '#ffffff', name: '#0fa96c' },
+  media_buyer:      { grad: 'from-[#818cf8] to-[#6366f1]', text: '#ffffff', name: '#6366f1' },
+  social_media:     { grad: 'from-[#f472b6] to-[#ec4899]', text: '#ffffff', name: '#ec4899' },
+  designer:         { grad: 'from-[#fb923c] to-[#f97316]', text: '#ffffff', name: '#f97316' },
+  product_research: { grad: 'from-[#2dd4bf] to-[#14b8a6]', text: '#ffffff', name: '#14b8a6' },
+  viewer:           { grad: 'from-[#94a3b8] to-[#64748b]', text: '#ffffff', name: '#64748b' },
+}
+
+function deptStyle(profile: Profile | undefined) {
+  return DEPARTMENT_STYLE[profile?.role ?? 'viewer'] ?? DEPARTMENT_STYLE.viewer
+}
+
 /** Renders @Name mentions in gold semibold. */
 function renderBody(body: string, profiles: Profile[]) {
   const parts = body.split(/(@[\w\u0600-\u06FF][\w\u0600-\u06FF\s]*?)(?=\s|$|[,!.?])/g)
@@ -42,12 +59,13 @@ function dayLabel(key: string): string {
 }
 
 function Avatar({ profile, size = 36 }: { profile: Profile | undefined; size?: number }) {
+  const style = deptStyle(profile)
   return (
     <div
-      className="rounded-full bg-gradient-to-br from-[#f0c42e] to-[#d29a0c] flex items-center justify-center shadow-[0_4px_12px_rgba(210,154,12,0.3)] shrink-0"
-      style={{ width: size, height: size }}
+      className={`rounded-full bg-gradient-to-br ${style.grad} flex items-center justify-center shrink-0`}
+      style={{ width: size, height: size, boxShadow: `0 3px 10px ${style.name}33` }}
     >
-      <span className="font-bold text-[#1a1405]" style={{ fontSize: size * 0.38 }}>
+      <span className="font-bold" style={{ fontSize: size * 0.38, color: style.text }}>
         {profile?.full_name?.charAt(0) ?? '?'}
       </span>
     </div>
@@ -127,8 +145,10 @@ function MessageRow({
       <div className="min-w-0 flex-1 pb-0.5">
         {!grouped && (
           <div className="flex items-baseline gap-2">
-            <span className="text-sm font-bold text-[var(--text-primary)]">{author?.full_name ?? 'Unknown'}</span>
-            {author && <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{roleLabel(author.role)}</span>}
+            <span className="text-sm font-bold" style={{ color: deptStyle(author).name }}>
+              {author?.full_name ?? 'Unknown'}
+            </span>
+            {author && <span className="text-[10px] text-[var(--text-muted)]">{roleLabel(author.role)}</span>}
             <span className="text-[11px] text-[var(--text-muted)]">{formatTime(message.created_at)}</span>
           </div>
         )}
