@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, Check, ChevronDown, ShieldCheck, Lock, AlertTriangle, Zap } from 'lucide-react'
+import { RefreshCw, Check, ChevronDown, ShieldCheck, Lock, AlertTriangle, Zap, RotateCcw, Unplug } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { refreshFromServer } from '../../lib/store'
+import { toast } from '../../lib/toast'
 import {
   PLATFORM_SETUP, PLATFORM_META, SECURITY_NOTES,
   DIFFICULTY_LABEL, type PlatformId,
@@ -71,6 +72,29 @@ export function IntegrationsPanel() {
     window.location.href = '/api/salla/connect'
   }
 
+  const disconnectSalla = async () => {
+    if (!window.confirm('Disconnect Salla?\n\nLive API access stops (sync + coupons + auto-recovery).\nYour collected data and history are KEPT.\nYou can reconnect anytime.')) return
+    setSyncing('salla')
+    try {
+      const token = (await supabase?.auth.getSession())?.data.session?.access_token
+      if (!token) { toast.error('Sign in required'); return }
+      const res = await fetch('/api/salla/disconnect', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      const json = await res.json().catch(() => ({}) as Record<string, unknown>)
+      if (res.ok && json.ok) {
+        toast.success(json.message as string ?? 'Salla disconnected.')
+        setSyncMessages((m) => ({ ...m, salla: 'Disconnected — reconnect to restore live access.' }))
+        void load()
+        void refreshFromServer()
+      } else {
+        toast.error(`Disconnect failed: ${json.error ?? res.status}`)
+      }
+    } catch (e) {
+      toast.error(String((e as Error).message).slice(0, 120))
+    } finally {
+      setSyncing(null)
+    }
+  }
+
   const syncAll = async () => {
     setSyncing('all')
     const token = (await supabase?.auth.getSession())?.data.session?.access_token
@@ -118,6 +142,8 @@ export function IntegrationsPanel() {
             message={syncMessages[pid]}
             onSync={() => syncPlatform(pid === 'salla' ? 'salla' : pid)}
             onConnect={connectSalla}
+            onReconnect={connectSalla}
+            onDisconnect={disconnectSalla}
           />
         ))}
       </div>
@@ -147,7 +173,7 @@ export function IntegrationsPanel() {
 }
 
 function PlatformCard({
-  pid, server, syncing, message, onSync, onConnect,
+  pid, server, syncing, message, onSync, onConnect, onReconnect, onDisconnect,
 }: {
   pid: PlatformId
   server?: PlatformStatus
@@ -155,6 +181,8 @@ function PlatformCard({
   message?: string
   onSync: () => void
   onConnect: () => void
+  onReconnect: () => void
+  onDisconnect: () => void | Promise<void>
 }) {
   const setup = PLATFORM_SETUP[pid]
   const meta = PLATFORM_META[pid]
@@ -221,10 +249,23 @@ function PlatformCard({
       <div className="flex items-center gap-2 pt-1">
         {pid === 'salla' ? (
           live ? (
-            <button onClick={onSync} disabled={syncing} className="btn btn-primary !text-xs !px-4 !py-2 flex-1">
-              <RefreshCw size={13} className={cn(syncing && 'animate-spin')} />
-              {syncing ? 'Syncing…' : 'Sync Now'}
-            </button>
+            <>
+              <button onClick={onSync} disabled={syncing} className="btn btn-primary !text-xs !px-3 !py-2 flex-1">
+                <RefreshCw size={13} className={cn(syncing && 'animate-spin')} />
+                {syncing ? 'Syncing…' : 'Sync Now'}
+              </button>
+              <button onClick={onReconnect} disabled={syncing}
+                title="Re-authorize to grant the latest scopes (coupons, carts, shipping)"
+                className="btn btn-outline !text-xs !px-3 !py-2 inline-flex items-center gap-1.5 shrink-0">
+                <RotateCcw size={12} /> Reconnect
+              </button>
+              <button onClick={() => void onDisconnect()} disabled={syncing}
+                title="Revoke live access — data is kept"
+                className="btn !text-xs !px-2.5 !py-2 inline-flex items-center gap-1.5 shrink-0"
+                style={{ background: 'rgba(239,68,68,.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,.25)' }}>
+                <Unplug size={12} />
+              </button>
+            </>
           ) : (
             <button onClick={onConnect} className="btn btn-primary !text-xs !px-4 !py-2 flex-1">
               <Zap size={13} /> Connect Salla
