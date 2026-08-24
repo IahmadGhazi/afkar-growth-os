@@ -94,7 +94,7 @@ export const backend = {
         selectAllSafe<TaskComment>('task_comments', 'created_at'),
         selectAllSafe<SallaCustomer>('customers', 'total_spent'),
         selectAllSafe<SallaOrder>('orders', 'date_created'),
-        selectAllSafe<SallaProduct>('store_products'),
+        selectAllSafe<SallaProduct>('store_products', 'synced_at'),
         selectAllSafe<SallaReview>('reviews', 'created_at'),
         selectAllSafe<any>('shipments', 'created_at'),
         selectAllSafe<any>('order_sla', 'updated_at'),
