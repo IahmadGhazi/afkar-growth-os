@@ -1298,7 +1298,7 @@ function startLiveSync() {
       detail: { at: Date.now() },
     }))
   })
-  for (const table of ['messages', 'tasks', 'product_candidates', 'kpi_snapshots', 'task_comments', 'campaigns', 'campaign_metrics']) {
+  for (const table of ['messages', 'tasks', 'product_candidates', 'kpi_snapshots', 'task_comments', 'campaigns', 'campaign_metrics', 'orders', 'customers', 'store_products', 'reviews']) {
     liveChannel.on(
       'postgres_changes',
       { event: '*', schema: 'public', table },
