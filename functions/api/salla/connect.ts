@@ -30,7 +30,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
   const mode = url.searchParams.get("mode") === "basic" ? "basic" : "full"
   const scopes = mode === "basic"
     ? ["customers.read", "orders.read", "products.read", "reviews.read", "carts.read", "offline_access"]
-    : ["customers.read", "orders.read", "products.read", "reviews.read", "carts.read", "marketing.read_write", "shipping.read", "offline_access"]
+    : ["customers.read", "orders.read", "products.read", "reviews.read", "carts.read", "marketing.read_write", "offline_access"]
 
   const payload = JSON.stringify({ t: Date.now(), n: crypto.randomUUID(), m: mode })
   const sig = await hmacSign(payload, env.SALLA_WEBHOOK_SECRET)

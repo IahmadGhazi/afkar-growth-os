@@ -33,7 +33,10 @@ export async function onRequest(context: { request: Request; env: Record<string,
             }
           }
         } catch { /* fall through to generic error */ }
-        return Response.redirect(`${origin}/data?salla=error&reason=${encodeURIComponent("invalid_scope — enable 'Marketing Read & Write' + 'Shipping Read' for the app in Partners Portal, then Reconnect")}`, 302)
+        // Surface Salla's own diagnosis (scope/error_description params) for surgical fixing
+        const detail = [url.searchParams.get("scope"), url.searchParams.get("error_description")]
+          .filter(Boolean).join(" | ")
+        return Response.redirect(`${origin}/data?salla=error&reason=${encodeURIComponent(`invalid_scope ${detail}`.trim())}`, 302)
       }
       return Response.redirect(`${origin}/data?salla=error&reason=${encodeURIComponent(oauthError ?? "no_code_in_callback")}`, 302)
     }
