@@ -161,11 +161,11 @@ export async function onRequest(context: { request: Request; env: Record<string,
         const orderId = `ord_salla_${o.id}`
         const cm = await custMap()
         const sallaCustId = typeof o.customer?.id === "number" ? o.customer.id : typeof o.customer_id === "number" ? o.customer_id : null
-        await upsert("orders", {
+        const orderRow = {
           id: orderId, client_id: clientId, salla_id: o.id,
           reference: o.reference_id != null ? String(o.reference_id) : null,
           customer_id: sallaCustId ? (cm.get(sallaCustId) ?? null) : null,
-          status: statusOf(o.status),
+          status: typeof o.status === "string" ? o.status : (o.status?.slug ?? o.status?.name ?? "payment_completed"),
           payment_method: typeof o.payment_method === "string" ? o.payment_method : (o.payment_method?.slug ?? null),
           selling_channel: o.selling_channel ?? null,
           total_amount: num(o.amounts?.total?.amount) ?? num(o.total) ?? 0,
@@ -179,7 +179,16 @@ export async function onRequest(context: { request: Request; env: Record<string,
           date_created: o.date?.date ?? now,
           date_completed: o.completed_at?.date ?? null,
           synced_at: now,
-        })
+        }
+        try {
+          await upsert("orders", orderRow)
+        } catch (e) {
+          // Column not added yet? Retry without reference so the order still lands.
+          if (String((e as Error).message).includes("column orders.reference")) {
+            const { reference, ...rest } = orderRow
+            await upsert("orders", rest)
+          } else throw e
+        }
         await fetch(`${env.SUPABASE_URL}/rest/v1/order_timeline`, {
           method: "POST", headers: H,
           body: JSON.stringify({ id: eventId, order_id: orderId, client_id: clientId, event: body.event, details: { id: o.id ?? null, reference_id: o.reference_id ?? null }, event_time: now }),
