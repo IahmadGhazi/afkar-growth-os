@@ -71,11 +71,23 @@ export async function onRequest(context: { request: Request; env: Record<string,
 
   const H = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, "content-type": "application/json", prefer: "resolution=merge-duplicates,return=minimal" }
   const GET = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` }
-  const clientId = `cli_salla_${body.merchant}`
   const data = body.data ?? {}
   const now = new Date().toISOString()
   const eventId = `${body.event}_${body.merchant}_${Date.now()}`
   const errors: string[] = []
+
+  // Resolve the client_id for this merchant via integration_tokens —
+  // pattern-independent (works whether the row id is cli_salla_X or cli_salla_store_X).
+  async function resolveClientId(): Promise<string | null> {
+    try {
+      const res = await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?platform=eq.salla&store_id=eq.${body.merchant}&select=client_id`, { headers: GET })
+      if (res.ok) {
+        const rows = (await res.json()) as Array<{ client_id?: string }>
+        if (rows[0]?.client_id) return rows[0].client_id
+      }
+    } catch { /* fallthrough */ }
+    return null
+  }
 
   async function upsert(table: string, row: Record<string, unknown>) {
     const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?on_conflict=id`, {
@@ -94,6 +106,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
     }).then((r) => r.json() as Promise<{ name?: string; merchant?: { name?: string } }>).catch(() => ({}))
 
     const storeName = userInfo.merchant?.name ?? userInfo.name ?? `Salla Store ${body.merchant}`
+    const clientId = `cli_salla_store_${body.merchant}`
 
     try {
       await upsert("clients", {
@@ -119,9 +132,9 @@ export async function onRequest(context: { request: Request; env: Record<string,
     return json({ ok: true, event: body.event, message: `Connected store: ${storeName}`, errors: errors.length ? errors : undefined })
   }
 
-  // For ALL other events, the client must already exist
-  const clientRes = await fetch(`${env.SUPABASE_URL}/rest/v1/clients?id=eq.${clientId}&select=id`, { headers: GET })
-  if (!(await clientRes.json()).length) return json({ error: "unknown merchant — install the app first" }, 404)
+  // For ALL other events, the client must already exist (via OAuth or authorize event)
+  const clientId = await resolveClientId()
+  if (!clientId) return json({ error: "unknown merchant — connect the store first" }, 404)
 
   // Customer-ID resolver for order events
   async function custMap(): Promise<Map<number, string>> {
