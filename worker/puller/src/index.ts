@@ -211,7 +211,8 @@ export default {
   },
   async fetch(request: Request, env: any, ctx: { waitUntil: (p: Promise<unknown>) => void }) {
     if (request.method !== "POST") return new Response("POST only", { status: 405 })
-    if (env.PULLER_TOKEN && request.headers.get("x-puller-token") !== env.PULLER_TOKEN)
+    // Fail closed: if PULLER_TOKEN is not configured, the HTTP trigger is disabled.
+    if (!env.PULLER_TOKEN || request.headers.get("x-puller-token") !== env.PULLER_TOKEN)
       return new Response("unauthorized", { status: 401 })
     const result = await runPull(env)
     return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } })

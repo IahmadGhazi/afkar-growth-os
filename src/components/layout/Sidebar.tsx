@@ -14,6 +14,9 @@ import {
   ShoppingBag,
   Store,
   Star,
+  ShoppingCart,
+  HeartPulse,
+  Sunrise,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useApp } from '@/lib/store'
@@ -32,6 +35,7 @@ const allNavigation: {
   section: 'campaigns' | 'users' | null
 }[] = [
   { name: 'Command Center', path: '/', icon: LayoutDashboard, section: null },
+  { name: 'Morning Briefing', path: '/briefing', icon: Sunrise, section: null },
   { name: 'My Work', path: '/my-work', icon: CheckSquare, section: null },
   { name: 'Weekly Plan', path: '/weekly-plan', icon: Target, section: null },
   { name: 'Tasks', path: '/tasks', icon: CheckSquare, section: null },
@@ -41,6 +45,8 @@ const allNavigation: {
   { name: 'Products', path: '/store-products', icon: Store, section: null },
   { name: 'Customers', path: '/customers', icon: Users2, section: null },
   { name: 'Orders', path: '/orders', icon: ShoppingBag, section: null },
+  { name: 'Cart Recovery', path: '/carts', icon: ShoppingCart, section: null },
+  { name: 'Retention', path: '/retention', icon: HeartPulse, section: null },
   { name: 'Reviews', path: '/reviews', icon: Star, section: null },
   { name: 'Campaigns', path: '/campaigns', icon: Megaphone, section: 'campaigns' },
   { name: 'KPIs', path: '/kpis', icon: BarChart3, section: null },

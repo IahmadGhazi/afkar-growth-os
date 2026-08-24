@@ -1,5 +1,5 @@
-/**
- * POST /api/salla/sync — pulls customers, orders, products, reviews from
+﻿/**
+ * POST /api/salla/sync â€” pulls customers, orders, products, reviews from
  * the Salla API using stored tokens. Writes to the respective tables.
  * Staff gate: admin / account_manager / media_buyer.
  */
@@ -102,7 +102,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
   try {
     let page = 1
     let total = 0
-    while (page <= 10) {
+    while (page <= 50) {
       const body = await sallaGet("/customers", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const c of list) {
@@ -134,7 +134,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
 
     let page = 1
     let total = 0
-    while (page <= 10) {
+    while (page <= 100) {
       const body = await sallaGet("/orders", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const o of list) {
@@ -174,7 +174,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
   try {
     let page = 1
     let total = 0
-    while (page <= 10) {
+    while (page <= 50) {
       const body = await sallaGet("/products", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const p of list) {
@@ -201,24 +201,93 @@ export async function onRequest(context: { request: Request; env: Record<string,
 
   // ---- SYNC REVIEWS ----
   try {
-    const body = await sallaGet("/feedbacks", { per_page: "50", type: "product" })
-    const list = (body?.data ?? []) as any[]
+    let page = 1
     let total = 0
-    for (const r of list) {
-      await upsert("reviews", {
-        id: `rev_salla_${r.id}`, client_id: clientId, salla_id: r.id,
-        type: r.type ?? "product", rating: r.rating ?? null,
-        content: r.content ?? null,
-        customer_name: r.customer?.name ?? null,
-        product_name: r.product?.name ?? null,
-        is_published: r.is_published ?? true,
-        likes_count: r.likes_count ?? 0,
-        created_at: r.created_at ?? now,
-      })
-      total++
+    while (page <= 20) {
+      const body = await sallaGet("/feedbacks", { per_page: "50", type: "product", page: String(page) })
+      const list = (body?.data ?? []) as any[]
+      for (const r of list) {
+        await upsert("reviews", {
+          id: `rev_salla_${r.id}`, client_id: clientId, salla_id: r.id,
+          type: r.type ?? "product", rating: r.rating ?? null,
+          content: r.content ?? null,
+          customer_name: r.customer?.name ?? null,
+          product_name: r.product?.name ?? null,
+          is_published: r.is_published ?? true,
+          likes_count: r.likes_count ?? 0,
+          created_at: sallaIso(r.created_at) ?? now,
+        })
+        total++
+      }
+      const totalPages = body?.pagination?.totalPages ?? 1
+      if (page >= totalPages || list.length === 0) break
+      page++
     }
     results.reviews = `${total} synced`
   } catch (e) { results.reviews = `error: ${String((e as Error).message).slice(0, 200)}` }
+
+  // ---- SYNC SHIPMENTS (delivery health board data) ----
+  try {
+    let page = 1
+    let total = 0
+    while (page <= 20) {
+      const body = await sallaGet("/shipments", { page: String(page), per_page: "50" })
+      const list = (body?.data ?? []) as any[]
+      for (const s of list) {
+        await upsert("shipments", {
+          id: `shp_salla_${s.id}`, client_id: clientId,
+          order_id: s.order_id ? `ord_salla_${s.order_id}` : null,
+          salla_shipment_id: s.id,
+          status: typeof s.status === "string" ? s.status : (s.status?.slug ?? "created"),
+          shipping_company: s.shipping_company?.name ?? s.courier?.name ?? null,
+          tracking_number: s.tracking_number ?? null,
+          shipment_date: s.shipment_date?.date ?? null,
+          created_at: s.created_at?.date ?? now,
+          updated_at: now,
+        })
+        total++
+      }
+      const totalPages = body?.pagination?.totalPages ?? 1
+      if (page >= totalPages || list.length === 0) break
+      page++
+    }
+    results.shipments = `${total} synced`
+  } catch (e) { results.shipments = `error: ${String((e as Error).message).slice(0, 200)}` }
+
+  // ---- SYNC ABANDONED CARTS (recovery engine fuel) ----
+  try {
+    let page = 1
+    let total = 0
+    while (page <= 10) {
+      const body = await sallaGet("/carts/abandoned", { page: String(page), per_page: "60" })
+      const list = (body?.data ?? []) as any[]
+      for (const c of list) {
+        const items = Array.isArray(c.items)
+          ? c.items.map((it: any) => ({ name: it.name ?? it.product?.name ?? "Item", quantity: num(it.quantity) ?? 1, amount: num(it.amounts?.price?.amount ?? it.price?.amount) }))
+          : []
+        await upsert("abandoned_carts", {
+          id: `cart_salla_${c.id}`, client_id: clientId, salla_cart_id: c.id,
+          customer_id: c.customer?.id ? `cust_salla_${c.customer.id}` : null,
+          status: c.status === "purchased" ? "purchased" : "abandoned",
+          cart_total: num(c.total?.amount) ?? 0,
+          items,
+          checkout_url: c.checkout_url ?? null,
+          customer_name: c.customer?.name ?? null,
+          customer_mobile: c.customer?.mobile ? `${c.customer.mobile_code ?? ""}${c.customer.mobile}` : null,
+          customer_email: c.customer?.email ?? null,
+          coupon_code: c.coupon?.code ?? null,
+          age_minutes: num(c.age_in_minutes),
+          created_at: c.created_at?.date ?? now,
+          updated_at: c.updated_at?.date ?? now,
+        })
+        total++
+      }
+      const totalPages = body?.pagination?.totalPages ?? 1
+      if (page >= totalPages || list.length === 0) break
+      page++
+    }
+    results.abandonedCarts = `${total} synced`
+  } catch (e) { results.abandonedCarts = `error: ${String((e as Error).message).slice(0, 200)}` }
 
   return json({ ok: true, results })
 }

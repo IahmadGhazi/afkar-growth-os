@@ -7,7 +7,10 @@ import { LiveBadge } from '../../components/shared/LiveBadge'
 export function StoreProducts() {
   const { state } = useApp()
   const [search, setSearch] = useState('')
-  const products = state.sallaProducts ?? []
+  const products = useMemo(
+    () => (state.sallaProducts ?? []).filter((p) => !state.currentClientId || p.client_id === state.currentClientId),
+    [state.sallaProducts, state.currentClientId],
+  )
 
   const filtered = useMemo(() => {
     if (!search.trim()) return products
@@ -86,7 +89,7 @@ export function StoreProducts() {
                   </span>
                 )}
                 <div className="flex items-start justify-between gap-2 pr-1">
-                  <div className="font-semibold text-sm text-[var(--text-primary)] leading-snug">{p.name}</div>
+                  <div className="font-semibold text-sm text-[var(--text-primary)] leading-snug" dir="auto">{p.name}</div>
                   {!outOfStock && (
                     <span className={`badge shrink-0 ${p.status === 'active' ? 'bg-[var(--positive-soft)] text-[var(--positive)]' : 'bg-[var(--track)] text-[var(--text-muted)]'}`}>{p.status.replace(/_/g, ' ')}</span>
                   )}

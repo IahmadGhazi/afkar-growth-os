@@ -3,12 +3,19 @@
  * Every step is wrapped: any failure redirects to /data with the reason
  * visible in the URL so the user knows exactly what went wrong.
  */
+async function hmacSign(message: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message))
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("")
+}
+
 export async function onRequest(context: { request: Request; env: Record<string, string | undefined> }) {
   const origin = new URL(context.request.url).origin
 
   try {
     const url = new URL(context.request.url)
     const code = url.searchParams.get("code")
+    const state = url.searchParams.get("state")
     const oauthError = url.searchParams.get("error")
 
     if (oauthError || !code) {
@@ -18,6 +25,25 @@ export async function onRequest(context: { request: Request; env: Record<string,
     const env = context.env
     if (!env.SALLA_CLIENT_ID || !env.SALLA_CLIENT_SECRET || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
       return Response.redirect(`${origin}/data?salla=error&reason=missing_secrets_on_server`, 302)
+    }
+
+    // Step 0: Verify OAuth state (CSRF defense). Signature must match AND
+    // the handshake must be younger than 15 minutes.
+    if (state && env.SALLA_WEBHOOK_SECRET) {
+      try {
+        const dot = state.lastIndexOf(".")
+        if (dot > 0) {
+          const payload = Buffer.from(state.slice(0, dot), "base64url").toString("utf8")
+          const expectedSig = await hmacSign(payload, env.SALLA_WEBHOOK_SECRET)
+          const parsed = JSON.parse(payload) as { t?: number }
+          const fresh = typeof parsed.t === "number" && Date.now() - parsed.t < 15 * 60_000
+          if (expectedSig !== state.slice(dot + 1) || !fresh) {
+            return Response.redirect(`${origin}/data?salla=error&reason=${encodeURIComponent(fresh ? "state_signature_mismatch" : "state_expired_retry_connect")}`, 302)
+          }
+        }
+      } catch {
+        return Response.redirect(`${origin}/data?salla=error&reason=state_invalid`, 302)
+      }
     }
 
     // Step 1: Exchange code for tokens
@@ -54,9 +80,11 @@ export async function onRequest(context: { request: Request; env: Record<string,
       if (infoRes.ok) userInfo = await infoRes.json()
     } catch { /* non-critical: use fallbacks */ }
 
-    const storeId = String(userInfo.merchant?.id ?? userInfo.id ?? `store_${Date.now()}`)
+    // Normalize identity: always the bare merchant number; one canonical client.
+    const rawMerchant = String(userInfo.merchant?.id ?? userInfo.id ?? `store_${Date.now()}`)
+    const storeId = rawMerchant.replace(/^store_/, "")
     const storeName = userInfo.merchant?.name ?? userInfo.name ?? "Salla Store"
-    const clientId = `cli_salla_${storeId}`
+    const clientId = `cli_salla_store_${storeId}`
     const expiresAt = new Date(Date.now() + (Number(tokens.expires) || 1209599) * 1000).toISOString()
 
     const H = {

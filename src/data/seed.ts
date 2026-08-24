@@ -18,6 +18,10 @@ import type {
   SallaOrder,
   SallaProduct,
   SallaReview,
+  SallaShipment,
+  OrderSla,
+  OrderTimelineEvent,
+  AbandonedCart,
   SyncRun,
   Task,
   TaskComment,
@@ -51,10 +55,10 @@ export interface AppState {
   sallaOrders: SallaOrder[]
   sallaProducts: SallaProduct[]
   sallaReviews: SallaReview[]
-  shipments: any[]
-  orderSlas: any[]
-  orderTimeline: any[]
-  abandonedCarts: any[]
+  shipments: SallaShipment[]
+  orderSlas: OrderSla[]
+  orderTimeline: OrderTimelineEvent[]
+  abandonedCarts: AbandonedCart[]
   currentUserId: string | null
   currentClientId: string | null
   /** False until the first backend bootstrap resolves; the shell shows a

@@ -41,7 +41,7 @@ export function CustomerDrawer({ intel, onClose }: { intel: CustomerIntel | null
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold text-[var(--text-primary)] truncate">{c.first_name} {c.last_name}</h3>
+              <h3 className="text-base font-semibold text-[var(--text-primary)] truncate" dir="auto">{c.first_name} {c.last_name}</h3>
               {isVip && (
                 <span className="badge bg-[var(--warning-soft)] text-[var(--warning)]"><Crown size={11} /> VIP</span>
               )}

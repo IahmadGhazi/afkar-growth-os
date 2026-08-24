@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Search, ShoppingBag, Clock, User, CreditCard, Layers } from 'lucide-react'
+import { Search, ShoppingBag, Clock, User, CreditCard, Layers, Truck, ShieldAlert } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { EmptyState } from '../../components/shared/ui'
 import { LiveBadge } from '../../components/shared/LiveBadge'
 import { orderStatusMeta, exactDateTime, relativeFromIso, STATUS_ORDER } from '../../lib/orderStatus'
 import { computeCustomerIntel, type CustomerIntel } from '../../lib/rfm'
 import { CustomerDrawer } from '../customers/CustomerDrawer'
+import { OrderDrawer } from './OrderDrawer'
 import type { SallaOrder } from '../../types/database'
 
 const itemQty = (it: { qty?: number; quantity?: number }) => it.qty ?? it.quantity ?? 1
@@ -16,8 +17,26 @@ export function Orders() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerIntel | null>(null)
-  const orders = state.sallaOrders ?? []
-  const customers = state.sallaCustomers ?? []
+  const [selectedOrder, setSelectedOrder] = useState<SallaOrder | null>(null)
+  const cid = state.currentClientId
+  const scoped = <T extends { client_id: string }>(rows: T[] | null | undefined): T[] =>
+    (rows ?? []).filter((r) => !cid || r.client_id === cid)
+  const orders = useMemo(() => scoped(state.sallaOrders), [state.sallaOrders, cid])
+  const customers = useMemo(() => scoped(state.sallaCustomers), [state.sallaCustomers, cid])
+  const timeline = useMemo(() => scoped(state.orderTimeline), [state.orderTimeline, cid])
+  const shipments = useMemo(() => scoped(state.shipments), [state.shipments, cid])
+  const slas = useMemo(() => scoped(state.orderSlas), [state.orderSlas, cid])
+
+  // ── Delivery health (from real shipment data)
+  const PROBLEM_SHIP = new Set(['cancelled', 'lost', 'damaged', 'return_to_origin', 'return_in_progress', 'unable_to_deliver'])
+  const IN_TRANSIT = new Set(['created', 'creating', 'updated', 'in_progress', 'in_transit', 'delivering', 'shipped', 'to_be_reattempted', 'reattempted', 'received_at_final_hub'])
+  const delivery = useMemo(() => {
+    const problems = shipments.filter((s) => PROBLEM_SHIP.has(s.status))
+    const moving = shipments.filter((s) => IN_TRANSIT.has(s.status))
+    const done = shipments.filter((s) => s.status === 'delivered' || s.status === 'partially_delivered')
+    return { problems: problems.length, moving: moving.length, delivered: done.length, hasAny: shipments.length > 0 }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shipments])
 
   const intel = useMemo(() => computeCustomerIntel(customers, orders), [customers, orders])
   const customerById = useMemo(() => {
@@ -73,6 +92,23 @@ export function Orders() {
 
       <LiveBadge />
 
+      {/* Delivery health strip */}
+      {delivery.hasAny && (
+        <div className="glass-card px-4 py-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
+          <span className="flex items-center gap-1.5 font-semibold uppercase tracking-wider text-[var(--text-muted)] text-[11px]">
+            <Truck size={12} /> Delivery
+          </span>
+          <span className="text-[var(--text-muted)]">{delivery.moving} in transit</span>
+          <span className="text-[var(--positive)]">{delivery.delivered} delivered</span>
+          {delivery.problems > 0 && (
+            <span className="flex items-center gap-1.5 font-semibold px-2 py-0.5 rounded-full"
+              style={{ color: '#ef4444', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)' }}>
+              <ShieldAlert size={12} /> {delivery.problems} need attention
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Status color legend */}
       {statusCounts.length > 0 && (
         <div className="glass-card px-4 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
@@ -127,7 +163,10 @@ export function Orders() {
             const cust = o.customer_id ? customerById.get(o.customer_id) : undefined
             const when = o.date_created ?? o.synced_at
             return (
-              <div key={o.id} className="glass-card relative overflow-hidden hover-lift px-4 sm:px-5 py-3.5">
+              <div key={o.id} className="glass-card relative overflow-hidden hover-lift px-4 sm:px-5 py-3.5 cursor-pointer"
+                role="button" tabIndex={0}
+                onClick={() => setSelectedOrder(o)}
+                onKeyDown={(e) => { if (e.key === 'Enter') setSelectedOrder(o) }}>
                 {/* status accent stripe */}
                 <span aria-hidden className="absolute inset-y-0 left-0 w-[3px]" style={{ background: meta.color }} />
                 <div className="flex flex-wrap md:flex-nowrap items-start gap-x-4 gap-y-2">
@@ -191,6 +230,18 @@ export function Orders() {
       )}
 
       <CustomerDrawer intel={selectedCustomer} onClose={() => setSelectedCustomer(null)} />
+      <OrderDrawer
+        order={selectedOrder}
+        timeline={timeline}
+        shipments={shipments}
+        slas={slas}
+        customerName={
+          selectedOrder?.customer_id
+            ? (() => { const c = customerById.get(selectedOrder.customer_id)?.customer; return c ? `${c.first_name} ${c.last_name}`.trim() : undefined })()
+            : undefined
+        }
+        onClose={() => setSelectedOrder(null)}
+      />
     </div>
   )
 }

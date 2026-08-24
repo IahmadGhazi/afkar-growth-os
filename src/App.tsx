@@ -19,6 +19,9 @@ import { Products } from './features/products/Products'
 import { Campaigns } from './features/campaigns/Campaigns'
 import { Customers } from './features/customers/Customers'
 import { Orders } from './features/orders/Orders'
+import { CartRecovery } from './features/carts/CartRecovery'
+import { Retention } from './features/retention/Retention'
+import { Briefing } from './features/briefing/Briefing'
 import { StoreProducts } from './features/store-products/StoreProducts'
 import { Reviews } from './features/reviews/Reviews'
 import { Kpis } from './features/kpis/Kpis'
@@ -29,6 +32,7 @@ import { NotificationsPanel } from './components/notifications/NotificationsPane
 
 const pageTitles: Record<string, string> = {
   '/': 'Command Center',
+  '/briefing': 'Morning Briefing',
   '/my-work': 'My Work',
   '/weekly-plan': 'Weekly Plan',
   '/tasks': 'Tasks',
@@ -38,6 +42,8 @@ const pageTitles: Record<string, string> = {
   '/store-products': 'Products',
   '/customers': 'Customers',
   '/orders': 'Orders',
+  '/carts': 'Cart Recovery',
+  '/retention': 'Retention',
   '/reviews': 'Reviews',
   '/campaigns': 'Campaigns',
   '/kpis': 'KPIs',
@@ -100,6 +106,8 @@ function App() {
     switch (currentPath) {
       case '/':
         return <CommandCenter onNavigate={navigate} />
+      case '/briefing':
+        return <Briefing onNavigate={navigate} />
       case '/my-work':
         return <MyWork />
       case '/tasks':
@@ -118,6 +126,10 @@ function App() {
         return <Customers />
       case '/orders':
         return <Orders />
+      case '/carts':
+        return <CartRecovery />
+      case '/retention':
+        return <Retention />
       case '/reviews':
         return <Reviews />
       case '/campaigns':
@@ -131,7 +143,12 @@ function App() {
       case '/settings':
         return <Settings />
       default:
-        return <CommandCenter onNavigate={navigate} />
+        return (
+          <div className="p-10 text-center space-y-3">
+            <div className="text-5xl font-black" style={{ color: '#d29a0c' }}>404</div>
+            <div className="text-sm text-[var(--text-muted)]">This page does not exist.</div>
+          </div>
+        )
     }
   }
 

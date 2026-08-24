@@ -8,7 +8,10 @@ export function Reviews() {
   const { state } = useApp()
   const [typeFilter, setTypeFilter] = useState('all')
   const [starFilter, setStarFilter] = useState(0)
-  const reviews = state.sallaReviews ?? []
+  const reviews = useMemo(
+    () => (state.sallaReviews ?? []).filter((r) => !state.currentClientId || r.client_id === state.currentClientId),
+    [state.sallaReviews, state.currentClientId],
+  )
 
   const filtered = useMemo(() => {
     let list = reviews
@@ -98,7 +101,7 @@ export function Reviews() {
                 </div>
                 <span className="text-xs text-[var(--text-muted)]">{new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
               </div>
-              {r.content && <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{r.content}</p>}
+              {r.content && <p className="text-sm text-[var(--text-secondary)] leading-relaxed" dir="auto">{r.content}</p>}
               <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
                 <span>{r.customer_name ?? 'Anonymous'}</span>
                 {r.product_name && <span className="flex items-center gap-1"><MessageSquare size={11} />{r.product_name}</span>}

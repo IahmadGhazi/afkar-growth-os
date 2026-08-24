@@ -8,8 +8,10 @@ import {
   Eye,
   ArrowLeftRight,
 } from 'lucide-react'
-import { useApp, type MemberInput } from '../../lib/store'
+import { useApp, type MemberInput, refreshFromServer } from '../../lib/store'
 import { teamMemberStats, roleLabel } from '../../lib/selectors'
+import { adminUsers } from '../../lib/admin-users'
+import { toast } from '../../lib/toast'
 import { SectionTitle, PrimaryButton, EmptyState } from '../../components/shared/ui'
 import type { Profile } from '../../types/database'
 
@@ -104,11 +106,29 @@ export function Team() {
   const viewing = state.profiles.find((profile) => profile.id === state.currentUserId)
   const isAdminView = state.currentUserId === state.profiles.find((p) => p.role === 'super_admin')?.id
 
-  const submit = () => {
+  const submit = async () => {
     if (!form.fullName.trim() || !form.email.trim()) return
-    actions.addMember(form)
-    setForm(emptyForm)
-    setShowForm(false)
+    // Route through the admin API so the member gets a REAL login
+    // (profile-only rows from the old flow could never sign in).
+    const tempPassword = `Afkar#${Math.random().toString(36).slice(2, 10)}!`
+    try {
+      const result = await adminUsers.create({
+        email: form.email.trim(),
+        password: tempPassword,
+        fullName: form.fullName.trim(),
+        role: form.role,
+      })
+      if (result.error) {
+        toast.error(`Could not create member: ${result.error}`)
+        return
+      }
+      toast.success(`Member created — share their temp password: ${tempPassword}`)
+      setForm(emptyForm)
+      setShowForm(false)
+      void refreshFromServer()
+    } catch {
+      toast.error('Could not reach the server to create the member.')
+    }
   }
 
   return (

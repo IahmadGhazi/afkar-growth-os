@@ -876,6 +876,28 @@ export const actions = {
           payload: message as unknown as Record<string, unknown>,
         })
       }
+      // @MENTION ENGINE: teammates named in the message get a real notification.
+      const author = s.profiles.find((p) => p.id === authorId)
+      const mentioned = new Set<string>()
+      for (const m of message.body.matchAll(/@([\u0621-\u064Aa-zA-Z0-9_]+)/g)) {
+        const token = m[1].toLowerCase()
+        const target = s.profiles.find(
+          (p) =>
+            p.id !== authorId &&
+            (p.full_name?.toLowerCase().startsWith(token) ||
+              p.full_name?.toLowerCase().split(/\s+/).includes(token) ||
+              p.email?.toLowerCase().split('@')[0] === token),
+        )
+        if (target && !mentioned.has(target.id)) mentioned.add(target.id)
+      }
+      for (const targetId of mentioned) {
+        const n = makeNotification(
+          uid('ntf'), targetId, clientId, 'mention',
+          `${author?.full_name ?? 'Teammate'} mentioned you`,
+          message.body.slice(0, 140), '/chat',
+        )
+        backend.insertNotification(n).catch(() => undefined)
+      }
       return { ...s, messages: [...s.messages, message] }
     })
   },

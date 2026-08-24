@@ -255,7 +255,7 @@ export interface SallaOrder {
   tax_amount: number
   currency: string
   items_count: number
-  items: Array<{ name: string; qty: number; price: number }> | null
+  items: Array<{ name?: string; quantity?: number; amount?: number | null }> | null
   date_created: string | null
   date_completed: string | null
   synced_at: string
@@ -301,7 +301,7 @@ export interface SallaShipment {
   client_id: string
   order_id: string | null
   salla_shipment_id: number | null
-  status: 'creating' | 'created' | 'updated' | 'cancelled' | 'delivered'
+  status: string
   shipping_company: string | null
   tracking_number: string | null
   shipment_date: string | null
@@ -332,9 +332,16 @@ export interface AbandonedCart {
   client_id: string
   salla_cart_id: number | null
   customer_id: string | null
-  status: 'abandoned' | 'updated' | 'purchased' | 'status_changed'
+  status: string
   cart_total: number
-  items: Array<{ name: string; qty: number }> | null
+  items: Array<{ name?: string; quantity?: number; amount?: number | null }> | null
+  checkout_url?: string | null
+  customer_name?: string | null
+  customer_mobile?: string | null
+  customer_email?: string | null
+  coupon_code?: string | null
+  age_minutes?: number | null
+  last_contacted_at?: string | null
   created_at: string
   updated_at: string
 }

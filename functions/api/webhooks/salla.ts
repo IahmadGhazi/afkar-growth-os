@@ -89,6 +89,17 @@ export async function onRequest(context: { request: Request; env: Record<string,
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)
     return json({ error: "not_configured" }, 501)
 
+  // ── SECURITY: verify Salla's webhook security strategy = Token.
+  // Salla sends the shared secret in the Authorization header
+  // (raw or Bearer-prefixed). No valid secret → reject with 401.
+  const expected = env.SALLA_WEBHOOK_SECRET
+  if (!expected) return json({ error: "webhook_secret_not_configured" }, 501)
+  const got = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim()
+  if (got !== expected) {
+    console.error("[salla-webhook] REJECTED: invalid or missing authorization token")
+    return json({ error: "unauthorized" }, 401)
+  }
+
   let body: { event?: string; merchant?: number | string; data?: Record<string, unknown> }
   try { body = await request.json() } catch { return json({ error: "invalid JSON" }, 400) }
   if (!body.event || !body.merchant) return json({ error: "missing event or merchant" }, 400)
@@ -275,14 +286,158 @@ export async function onRequest(context: { request: Request; env: Record<string,
         break
       }
       case "shipment.created":
-      case "shipment.updated": {
+      case "shipment.updated":
+      case "order.shipment.created":
+      case "order.shipment.creating":
+      case "shipment.status.updated": {
         const ship = data as Record<string, any>
         await upsert("shipments", {
           id: `shp_salla_${ship.id}`, client_id: clientId,
-          salla_shipment_id: ship.id, status: statusOf(ship.status),
-          shipping_company: ship.company ?? null, tracking_number: ship.tracking_number ?? null,
+          order_id: ship.order_id ? `ord_salla_${ship.order_id}` : null,
+          salla_shipment_id: ship.id,
+          status: statusOf(ship.status),
+          shipping_company: ship.shipping_company?.name ?? ship.company?.name ?? null,
+          tracking_number: ship.tracking_number ?? null,
+          shipment_date: ship.shipment_date?.date ?? null,
           updated_at: now,
         })
+        if (ship.order_id) await announce(env, { table: "shipments", row_id: `shp_salla_${ship.id}` })
+        break
+      }
+      case "shipment.cancelled":
+      case "order.shipment.cancelled": {
+        const ship = data as Record<string, any>
+        await upsert("shipments", {
+          id: `shp_salla_${ship.id}`, client_id: clientId,
+          order_id: ship.order_id ? `ord_salla_${ship.order_id}` : null,
+          salla_shipment_id: ship.id, status: "cancelled",
+          tracking_number: ship.tracking_number ?? null, updated_at: now,
+        })
+        break
+      }
+      // ── Reviews: strike-back on unhappy customers
+      case "review.added":
+      case "review.updated":
+      case "review.created": {
+        const r = data as Record<string, any>
+        const rating = num(r.rating)
+        await upsert("reviews", {
+          id: `rev_salla_${r.id}`, client_id: clientId, salla_id: r.id,
+          type: r.type ?? "product", rating,
+          content: typeof r.content === "string" ? r.content : null,
+          customer_name: r.customer?.name ?? null,
+          product_name: r.product?.name ?? null,
+          is_published: r.is_published ?? true,
+          likes_count: num(r.likes_count) ?? 0,
+          created_at: sallaIso(r.created_at) ?? now,
+        })
+        // Unhappy customer → instant notification for every admin
+        if (rating !== null && rating <= 2) {
+          const profRes = await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?role=in.(super_admin,account_manager)&select=id`, { headers: GET })
+          const admins = profRes.ok ? (await profRes.json()) as Array<{ id: string }> : []
+          for (const a of admins.slice(0, 5)) {
+            await fetch(`${env.SUPABASE_URL}/rest/v1/notifications`, {
+              method: "POST", headers: H,
+              body: JSON.stringify({
+                id: `ntf_review_${r.id}_${a.id}`, user_id: a.id, client_id: clientId,
+                type: "review_alert",
+                title: `⚠️ ${rating}★ review needs you`,
+                body: `${r.customer?.name ?? "A customer"} on ${r.product?.name ?? "a product"}: ${String(r.content ?? "").slice(0, 120)}`,
+                link: "/reviews", is_read: false, created_at: now,
+              }),
+            }).catch(() => {})
+          }
+        }
+        await announce(env, { table: "reviews", row_id: `rev_salla_${r.id}` })
+        break
+      }
+      // ── Abandoned carts: recovery engine fuel (aliases cover portal naming variants)
+      case "cart.abandoned":
+      case "abandoned_cart.created":
+      case "cart.created":
+      case "abandoned_cart.updated":
+      case "cart.updated": {
+        const c = data as Record<string, any>
+        const items = Array.isArray(c.items)
+          ? c.items.map((it: any) => ({ name: it.name ?? it.product?.name ?? "Item", quantity: num(it.quantity) ?? 1, amount: num(it.amounts?.price?.amount ?? it.price?.amount) }))
+          : []
+        const baseCart = {
+          id: `cart_salla_${c.id}`, client_id: clientId, salla_cart_id: c.id,
+          customer_id: c.customer?.id ? `cust_salla_${c.customer.id}` : null,
+          status: "abandoned" as string,
+          cart_total: num(c.total?.amount) ?? 0,
+          items,
+          created_at: sallaIso(c.created_at) ?? now,
+          updated_at: now,
+        }
+        const richCart = {
+          ...baseCart,
+          checkout_url: c.checkout_url ?? null,
+          customer_name: c.customer?.name ?? null,
+          customer_mobile: c.customer?.mobile ? `${c.customer.mobile_code ?? ""}${c.customer.mobile}` : null,
+          customer_email: c.customer?.email ?? null,
+          coupon_code: c.coupon?.code ?? null,
+          age_minutes: num(c.age_in_minutes),
+        }
+        try {
+          await upsert("abandoned_carts", richCart)
+          await announce(env, { table: "abandoned_carts", row_id: baseCart.id })
+        } catch (e) {
+          // New columns not added yet? Land the core row anyway.
+          if (String((e as Error).message).includes("abandoned_carts.")) {
+            await upsert("abandoned_carts", baseCart)
+          } else throw e
+        }
+        break
+      }
+      case "abandoned_cart.purchased":
+      case "cart.converted":
+      case "abandoned_cart.status.changed": {
+        const cartId = `cart_salla_${(data as any)?.id}`
+        await fetch(`${env.SUPABASE_URL}/rest/v1/abandoned_carts?salla_cart_id=eq.${(data as any)?.id}`, {
+          method: "PATCH", headers: H, body: JSON.stringify({ status: "purchased", updated_at: now }),
+        })
+        await announce(env, { table: "abandoned_carts", row_id: cartId })
+        break
+      }
+      // ── Order terminal states
+      case "order.cancelled":
+      case "cancellation.created": {
+        const orderId = `ord_salla_${(data as any)?.id ?? "unknown"}`
+        await fetch(`${env.SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, {
+          method: "PATCH", headers: H, body: JSON.stringify({ status: "canceled", synced_at: now }),
+        })
+        await fetch(`${env.SUPABASE_URL}/rest/v1/order_timeline`, {
+          method: "POST", headers: H,
+          body: JSON.stringify({ id: eventId, order_id: orderId, client_id: clientId, event: "order.cancelled", details: {}, event_time: now }),
+        })
+        await announce(env, { table: "orders", row_id: orderId })
+        break
+      }
+      case "order.refunded":
+      case "refund.created": {
+        const orderId = `ord_salla_${(data as any)?.id ?? (data as any)?.order?.id ?? "unknown"}`
+        await fetch(`${env.SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, {
+          method: "PATCH", headers: H, body: JSON.stringify({ status: "refunded", synced_at: now }),
+        })
+        await announce(env, { table: "orders", row_id: orderId })
+        break
+      }
+      case "order.deleted": {
+        const orderId = `ord_salla_${(data as any)?.id ?? "unknown"}`
+        await fetch(`${env.SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, {
+          method: "DELETE", headers: GET,
+        })
+        await announce(env, { table: "orders", row_id: orderId })
+        break
+      }
+      case "product.deleted": {
+        const pid = (data as any)?.id
+        if (pid) {
+          await fetch(`${env.SUPABASE_URL}/rest/v1/store_products?salla_id=eq.${pid}`, {
+            method: "PATCH", headers: H, body: JSON.stringify({ status: "hidden", quantity: 0, synced_at: now }),
+          })
+        }
         break
       }
       default:
