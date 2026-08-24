@@ -73,7 +73,11 @@ async function mintCoupon(cart: AbandonedCart, sbToken: string): Promise<{ ok: b
     })
     const body = await res.json().catch(() => ({}) as Record<string, unknown>)
     if (!res.ok || !body.ok) {
-      return { ok: false, error: String(body.detail ?? body.error ?? `HTTP ${res.status}`).slice(0, 140) }
+      const raw = String(body.detail ?? body.error ?? `HTTP ${res.status}`)
+      if (raw.includes("marketing.read_write")) {
+        return { ok: false, error: "Store token predates the marketing scope — reconnect Salla once (Data & Sources) and retry" }
+      }
+      return { ok: false, error: raw.slice(0, 140) }
     }
     return { ok: true, code: String((body as { code?: string }).code ?? '') }
   } catch (e) {
