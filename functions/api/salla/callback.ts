@@ -81,9 +81,11 @@ export async function onRequest(context: { request: Request; env: Record<string,
     }
 
     // Step 4: Store tokens
-    const tokenInsertRes = await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?on_conflict=client_id,platform`, {
+    const tokenId = `token_salla_${storeId}`
+    const tokenInsertRes = await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?on_conflict=id`, {
       method: "POST", headers: H,
       body: JSON.stringify({
+        id: tokenId,
         client_id: clientId, platform: "salla",
         access_token: tokens.access_token, refresh_token: tokens.refresh_token,
         expires_at: expiresAt, store_id: storeId, store_name: storeName,
