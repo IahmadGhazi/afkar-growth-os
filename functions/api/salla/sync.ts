@@ -336,5 +336,25 @@ export async function onRequest(context: { request: Request; env: Record<string,
     results.abandonedCarts = `${rows.length} synced`
   } catch (e) { results.abandonedCarts = `error: ${String((e as Error).message).slice(0, 160)}` }
 
+  // ---- CUSTOMER GROUPS (for store-side coupon targeting) ----
+  try {
+    const gRes = await sallaGet("/customers/groups", { per_page: "50" })
+    const groups = ((gRes?.data ?? []) as any[]).map((g) => ({ id: String(g.id), name: String(g.name ?? "Group") }))
+    if (groups.length) {
+      const clRes = await fetch(`${env.SUPABASE_URL}/rest/v1/clients?id=eq.${clientId}&select=settings`, {
+        headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
+      })
+      const current = clRes.ok ? ((await clRes.json()) as Array<{ settings?: Record<string, unknown> }>)[0]?.settings ?? {} : {}
+      await fetch(`${env.SUPABASE_URL}/rest/v1/clients?id=eq.${clientId}`, {
+        method: "PATCH",
+        headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, "content-type": "application/json", prefer: "return=minimal" },
+        body: JSON.stringify({ settings: { ...current, salla_groups: groups }, updated_at: now }),
+      })
+      results.groups = `${groups.length} synced`
+    } else {
+      results.groups = "0 synced"
+    }
+  } catch (e) { results.groups = `error: ${String((e as Error).message).slice(0, 120)}` }
+
   return json({ ok: true, results })
 }

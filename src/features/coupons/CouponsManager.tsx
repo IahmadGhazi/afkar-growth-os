@@ -7,6 +7,7 @@ import { useApp } from '../../lib/store'
 interface SallaCoupon {
   id: number
   code: string
+  name: string | null
   type: string
   amount: number | null
   status: string
@@ -14,6 +15,9 @@ interface SallaCoupon {
   expiryDate: string | null
   startDate: string | null
   freeShipping: boolean
+  usageLimit: number | null
+  minimumAmount: number | null
+  groupCount: number | null
   usage: { times: number | null; customers: number | null; sales: number | null }
 }
 
@@ -56,6 +60,13 @@ export function CouponsManager() {
   const preset = playbook.find((p) => p.id === presetId) ?? playbook[0] ?? DEFAULT_PRESETS[0]
   const percent = customPercent ?? preset.percent
   const hours = preset.hours
+
+  // Margin shields + targeting
+  const [usageLimit, setUsageLimit] = useState<string>('')
+  const [minimumAmount, setMinimumAmount] = useState<string>('')
+  const [targetGroupId, setTargetGroupId] = useState<string>('')
+  const sallaGroups = ((client?.settings as { salla_groups?: Array<{ id: string; name: string }> } | null)?.salla_groups ?? []) as Array<{ id: string; name: string }>
+  const [cleaning, setCleaning] = useState(false)
 
   const savePlaybook = async (next: Preset[]) => {
     if (!client) { toast.error('No client context'); return }
@@ -100,7 +111,14 @@ export function CouponsManager() {
     try {
       const res = await authedFetch('/api/salla/coupons/create', {
         method: 'POST',
-        body: JSON.stringify({ percentOff: percent, validHours: hours }),
+        body: JSON.stringify({
+          percentOff: percent,
+          validHours: hours,
+          name: preset.label,
+          usageLimit: usageLimit ? Number(usageLimit) : undefined,
+          minimumAmount: minimumAmount ? Number(minimumAmount) : undefined,
+          customerGroupIds: targetGroupId ? [Number(targetGroupId)] : undefined,
+        }),
       })
       const body = await res.json()
       if (res.ok && body.ok) {
@@ -111,6 +129,24 @@ export function CouponsManager() {
         toast.error(raw.includes('marketing.read_write') ? 'Token lacks marketing scope — reconnect Salla' : raw.slice(0, 130))
       }
     } finally { setCreating(false) }
+  }
+
+  const cleanupExpired = async () => {
+    const dead = (coupons ?? []).filter((c) => c.expiryDate && new Date(c.expiryDate.replace(' ', 'T')).getTime() < Date.now())
+    if (dead.length === 0) { toast.info('No expired coupons to clean'); return }
+    if (!window.confirm(`Delete ${dead.length} expired coupon${dead.length > 1 ? 's' : ''} from your Salla store?\n\nExpired codes are ops debt — they clutter the list and can leak if re-activated by accident.`)) return
+    setCleaning(true)
+    let ok = 0
+    for (const c of dead) {
+      try {
+        const res = await authedFetch(`/api/salla/coupons?id=${c.id}`, { method: 'DELETE' })
+        const body = await res.json().catch(() => ({}) as Record<string, unknown>)
+        if (res.ok && body.ok) ok++
+      } catch { /* keep going */ }
+    }
+    setCleaning(false)
+    toast.success(`Cleaned ${ok}/${dead.length} expired coupons`)
+    await load()
   }
 
   const saveEdit = async () => {
@@ -166,6 +202,15 @@ export function CouponsManager() {
         </button>
       </div>
 
+      {/* Expiry hygiene — one-tap ops debt cleanup */}
+      {(coupons ?? []).some((c) => c.expiryDate && new Date(c.expiryDate.replace(' ', 'T')).getTime() < Date.now()) && (
+        <button onClick={() => void cleanupExpired()} disabled={cleaning}
+          className="btn !text-xs !px-3 !py-2 inline-flex items-center gap-1.5 self-start"
+          style={{ background: 'rgba(239,68,68,.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,.25)' }}>
+          <Trash2 size={12} /> {cleaning ? 'Cleaning…' : 'Clean expired coupons'}
+        </button>
+      )}
+
       {/* ── PLAYBOOK (fully editable) */}
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center justify-between">
@@ -219,6 +264,31 @@ export function CouponsManager() {
             <TicketPercent size={13} /> {creating ? 'Minting…' : `Mint ${percent}% coupon`}
           </button>
         </div>
+
+        {/* Margin shields + store-side targeting */}
+        <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-[var(--hairline)]">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Shields</span>
+          <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+            Usage cap
+            <input type="number" min={1} placeholder="∞" value={usageLimit} onChange={(e) => setUsageLimit(e.target.value)}
+              className="field !w-16 !py-1 !text-xs tabular-nums" title="Max total redemptions — the leak shield" />
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+            Min order
+            <input type="number" min={0} placeholder="none" value={minimumAmount} onChange={(e) => setMinimumAmount(e.target.value)}
+              className="field !w-20 !py-1 !text-xs tabular-nums" title="Minimum order value (SAR) — margin shield" /> SAR
+          </label>
+          {sallaGroups.length > 0 && (
+            <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              Target group
+              <select value={targetGroupId} onChange={(e) => setTargetGroupId(e.target.value)}
+                className="field !w-36 !py-1 !text-xs" title="Only customers in this Salla group can use it">
+                <option value="">Everyone</option>
+                {sallaGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -249,7 +319,8 @@ export function CouponsManager() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-[var(--text-primary)] font-mono">{c.code}</span>
-                    {c.isGroup && <span className="badge bg-[var(--track)] text-[var(--text-muted)] text-[9px]">group</span>}
+                    {c.name && <span className="text-[11px] text-[var(--text-muted)] truncate max-w-[140px]" dir="auto">{c.name}</span>}
+                    {c.isGroup && <span className="badge bg-[var(--track)] text-[var(--text-muted)] text-[9px]">group{c.groupCount ? ` ×${c.groupCount}` : ''}</span>}
                     <span className="badge text-[9px]" style={
                       dead ? { background: 'var(--track)', color: 'var(--text-muted)' }
                         : { background: 'rgba(16,185,129,.12)', color: '#10b981' }
@@ -257,6 +328,8 @@ export function CouponsManager() {
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--text-muted)] mt-0.5">
                     {c.expiryDate && <span>exp {c.expiryDate.slice(0, 10)}</span>}
+                    {c.usageLimit != null && <span>cap {c.usageLimit}</span>}
+                    {c.minimumAmount != null && <span>min {c.minimumAmount} SAR</span>}
                     {c.usage.times != null && (
                       <span className="flex items-center gap-1"><Users size={10} /> {c.usage.times} uses · {c.usage.customers ?? 0} customers</span>
                     )}

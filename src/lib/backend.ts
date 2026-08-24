@@ -32,16 +32,20 @@ function table(name: string) {
   return supabase!.from(name)
 }
 
-async function selectAll<T>(name: string, orderCol = 'created_at'): Promise<T[]> {
+async function selectAll<T>(name: string, orderCol = 'created_at', limit?: number): Promise<T[]> {
   if (!backendAvailable) return []
-  const { data, error } = await table(name).select('*').order(orderCol, { ascending: true })
+  // Newest rows win: order DESC then reverse so callers keep oldest-first
+  // contracts while caps trim the ancient tail.
+  let q = table(name).select('*').order(orderCol, { ascending: false })
+  if (limit) q = q.limit(limit)
+  const { data, error } = await q
   if (error) throw new Error(`${name}: ${error.message}`)
-  return (data ?? []) as T[]
+  return ((data ?? []) as T[]).reverse()
 }
 
-async function selectAllSafe<T>(name: string, orderCol = 'created_at'): Promise<T[]> {
+async function selectAllSafe<T>(name: string, orderCol = 'created_at', limit?: number): Promise<T[]> {
   try {
-    return await selectAll<T>(name, orderCol)
+    return await selectAll<T>(name, orderCol, limit)
   } catch (err) {
     console.warn(`backend: skipping ${name}: ${(err as Error).message}`)
     return []
@@ -70,6 +74,8 @@ export const backend = {
   available: backendAvailable,
 
   async loadAll() {
+    // Unbounded tables get sane caps — the newest rows win. This keeps the
+    // 25s refresh loop fast and Supabase free-tier egress sane as data grows.
     const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages, reportNotes, products, campaigns, campaignMetrics, taskComments, sallaCustomers, sallaOrders, sallaProducts, sallaReviews, shipments, orderSlas, orderTimeline, abandonedCarts] =
       await Promise.all([
         selectAllSafe<Organization>('organizations'),
@@ -84,22 +90,22 @@ export const backend = {
         selectAllSafe<KpiSnapshot>('kpi_snapshots'),
         selectAllSafe<Connection>('connections'),
         selectAllSafe<SyncRun>('sync_runs', 'synced_at'),
-        selectAllSafe<Notification>('notifications'),
-        selectAllSafe<ActivityLog>('activity_logs'),
-        selectAllSafe<ChatMessage>('messages', 'created_at'),
+        selectAllSafe<Notification>('notifications', 'created_at', 200),
+        selectAllSafe<ActivityLog>('activity_logs', 'created_at', 100),
+        selectAllSafe<ChatMessage>('messages', 'created_at', 400),
         selectAllSafe<ClientReportNote>('client_reports', 'week_start'),
         selectAllSafe<ProductCandidate>('product_candidates'),
         selectAllSafe<Campaign>('campaigns'),
         selectAllSafe<CampaignMetric>('campaign_metrics', 'date'),
-        selectAllSafe<TaskComment>('task_comments', 'created_at'),
-        selectAllSafe<SallaCustomer>('customers', 'total_spent'),
-        selectAllSafe<SallaOrder>('orders', 'date_created'),
-        selectAllSafe<SallaProduct>('store_products', 'synced_at'),
-        selectAllSafe<SallaReview>('reviews', 'created_at'),
-        selectAllSafe<any>('shipments', 'created_at'),
-        selectAllSafe<any>('order_sla', 'updated_at'),
-        selectAllSafe<any>('order_timeline', 'event_time'),
-        selectAllSafe<any>('abandoned_carts', 'created_at'),
+        selectAllSafe<TaskComment>('task_comments', 'created_at', 500),
+        selectAllSafe<SallaCustomer>('customers', 'total_spent', 800),
+        selectAllSafe<SallaOrder>('orders', 'date_created', 800),
+        selectAllSafe<SallaProduct>('store_products', 'synced_at', 600),
+        selectAllSafe<SallaReview>('reviews', 'created_at', 300),
+        selectAllSafe<any>('shipments', 'created_at', 400),
+        selectAllSafe<any>('order_sla', 'updated_at', 500),
+        selectAllSafe<any>('order_timeline', 'event_time', 400),
+        selectAllSafe<any>('abandoned_carts', 'created_at', 400),
       ])
     return {
       organization: organization[0] ?? null,

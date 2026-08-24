@@ -55,6 +55,7 @@ function recoveryMessage(cart: AbandonedCart): string {
 
   if (cart.coupon_code) {
     lines.push(`\n🎁 وخصمنا لك هدية خاصة: **${cart.coupon_code}**`)
+    lines.push('🔑 الكود خاص فيك وما يستخدمه غيرك')
     lines.push('⏰ الكود ساري لفترة قصيرة فقط، لا يفوتك!')
   } else {
     lines.push('\n⚠️ الكمية محدودة ونفسنا توصلك قبل نفادها')
@@ -128,7 +129,7 @@ export function CartRecovery() {
   const [percent, setPercent] = useState(10)
   const [validHours, setValidHours] = useState(48)
   const [rowOverrides, setRowOverrides] = useState<Map<string, { percent: number; hours: number }>>(new Map())
-  const [activeCoupons, setActiveCoupons] = useState<Array<{ id: number; code: string; amount: number | null }>>([])
+  const [activeCoupons, setActiveCoupons] = useState<Array<{ id: number; code: string; amount: number | null; name?: string | null; expiryDate?: string | null; usage?: { times: number | null } }>>([])
   const codeFor = (c: AbandonedCart): string | null => c.coupon_code ?? freshCodes.get(c.id) ?? null
 
   const intel = useMemo(() => computeCustomerIntel(state.sallaCustomers ?? [], state.sallaOrders ?? []), [state.sallaCustomers, state.sallaOrders])
@@ -163,6 +164,46 @@ export function CartRecovery() {
     setFreshCodes((prev) => new Map(prev).set(cart.id, code))
     toast.success(`${code} armed on this cart — WhatsApp/Copy now carry it`)
     void refreshFromServer()
+  }
+
+  // ── Picker modal state (rich cards + confirm step — no accidental applies)
+  const [pickerCart, setPickerCart] = useState<AbandonedCart | null>(null)
+  const [pickerSelected, setPickerSelected] = useState<{ id: number; code: string; amount: number | null; name?: string | null; expiryDate?: string | null; usage?: { times: number | null } } | null>(null)
+
+  // ── BATCH ARM: mint ONE group coupon (N unique codes) → arm every warm/hot cart
+  const [batching, setBatching] = useState(false)
+  const armable = filtered.filter((c) => !codeFor(c) && c.customer_mobile)
+  const batchArm = async () => {
+    const targets = armable.slice(0, 50)
+    if (targets.length === 0) { toast.error('Every visible cart already has a coupon'); return }
+    if (!window.confirm(`Arm ${targets.length} carts?\n\nMints ONE group coupon with ${targets.length} unique ${percent}% codes (valid ${validHours >= 24 ? `${Math.round(validHours / 24)}d` : `${validHours}h`}) and attaches one code per cart. Each code is private + traceable.`)) return
+    setBatching(true)
+    try {
+      const { data } = await supabase!.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) { toast.error('Sign in required'); return }
+      const res = await fetch('/api/salla/coupons/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ percentOff: percent, validHours, batchSize: targets.length, name: `Batch recovery ${percent}%` }),
+      })
+      const body = await res.json()
+      const codes: string[] | null = body.codes
+      if (!res.ok || !body.ok || !codes?.length) {
+        toast.error(`Batch failed: ${String(body.detail ?? body.error ?? res.status).slice(0, 110)}`)
+        return
+      }
+      let armed = 0
+      for (let i = 0; i < targets.length; i++) {
+        const code = codes[i % codes.length]
+        const r = await supabase!.from('abandoned_carts').update({ coupon_code: code }).eq('id', targets[i].id)
+        if (!r.error) { armed++; setFreshCodes((prev) => new Map(prev).set(targets[i].id, code)) }
+      }
+      toast.success(`⚡ ${armed}/${targets.length} carts armed with unique ${percent}% codes`)
+      void refreshFromServer()
+    } finally {
+      setBatching(false)
+    }
   }
 
   const onMint = async (cart: AbandonedCart) => {
@@ -282,6 +323,14 @@ export function CartRecovery() {
             </button>
           ))}
         </div>
+        {armable.length > 1 && (
+          <button onClick={() => void batchArm()} disabled={batching}
+            title={`Mint ONE group coupon with ${Math.min(armable.length, 50)} unique ${percent}% codes and arm every warm cart — leak-proof bulk`}
+            className="btn !text-[11px] !px-2.5 !py-1 inline-flex items-center gap-1 ml-auto"
+            style={{ background: 'rgba(139,92,246,.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,.3)' }}>
+            ⚡ {batching ? 'Arming…' : `Arm all ${Math.min(armable.length, 50)}`}
+          </button>
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -375,14 +424,12 @@ export function CartRecovery() {
                       </button>
                     )}
                     {!codeFor(cart) && activeCoupons.length > 0 && (
-                      <select value="" onChange={(e) => { if (e.target.value) void attachExisting(cart, e.target.value) }}
-                        title="Attach an existing coupon instead of minting a new one"
-                        className="field !w-auto !py-1.5 !px-2 text-xs" style={{ color: '#25D36666', borderColor: 'rgba(37,211,102,.3)' }}>
-                        <option value="">📎 Attach…</option>
-                        {activeCoupons.map((ac) => (
-                          <option key={ac.id} value={ac.code}>{ac.code}{ac.amount != null ? ` (${ac.amount}%)` : ''}</option>
-                        ))}
-                      </select>
+                      <button onClick={() => { setPickerCart(cart); setPickerSelected(null) }}
+                        title="Pick from your existing active coupons"
+                        className="btn !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5"
+                        style={{ background: 'rgba(16,185,129,.1)', color: '#10b981', border: '1px solid rgba(16,185,129,.3)' }}>
+                        📎 Attach
+                      </button>
                     )}
                     {cart.checkout_url && (
                       <a href={cart.checkout_url} target="_blank" rel="noopener noreferrer"
@@ -415,6 +462,74 @@ export function CartRecovery() {
           Automated WhatsApp Business API campaigns are wired into the roadmap; the message templates here are already WABA-compatible.
         </span>
       </div>
+
+      {/* ── COUPON PICKER: rich cards → select → CONFIRM (never accidental) */}
+      {pickerCart && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] animate-[fadeIn_.2s_ease]" onClick={() => { setPickerCart(null); setPickerSelected(null) }} />
+          <div className="relative glass-card p-5 w-full max-w-lg space-y-4 animate-[pulseIn_.3s_var(--ease-spring)_both] max-h-[85vh] overflow-y-auto">
+            <div>
+              <div className="text-sm font-bold text-[var(--text-primary)]">Pick a coupon for <span dir="auto">{pickerCart.customer_name ?? 'Guest'}</span></div>
+              <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                Cart {Math.round(pickerCart.cart_total).toLocaleString()} SAR · select one, then confirm — nothing applies until you say so.
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {activeCoupons.map((ac) => {
+                const selected = pickerSelected?.id === ac.id
+                return (
+                  <button key={ac.id} onClick={() => setPickerSelected(ac)}
+                    className="w-full text-left rounded-xl border px-4 py-3 transition-all flex items-center gap-3"
+                    style={selected
+                      ? { borderColor: '#d29a0c', background: 'rgba(240,196,46,.1)', boxShadow: '0 0 0 1px #d29a0c55' }
+                      : { borderColor: 'var(--hairline)', background: 'var(--card)' }}>
+                    <span className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 font-mono text-xs font-bold"
+                      style={{ background: selected ? 'rgba(240,196,46,.18)' : 'var(--track)', color: selected ? '#d29a0c' : 'var(--text-primary)' }}>
+                      {ac.amount != null ? `${ac.amount}%` : '★'}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="text-sm font-bold font-mono text-[var(--text-primary)]">{ac.code}</span>
+                        {ac.name && <span className="text-[11px] text-[var(--text-muted)] truncate" dir="auto">{ac.name}</span>}
+                      </span>
+                      <span className="block text-[11px] text-[var(--text-muted)] mt-0.5">
+                        {ac.amount != null ? `${ac.amount}% off` : 'Special'} · active now
+                      </span>
+                    </span>
+                    {selected && <Check size={16} style={{ color: '#d29a0c' }} className="shrink-0" />}
+                  </button>
+                )
+              })}
+              {activeCoupons.length === 0 && (
+                <div className="text-xs text-[var(--text-muted)] py-4 text-center">
+                  No active coupons in your store — mint one with the {percent}% button, or create from the Coupons tab.
+                </div>
+              )}
+            </div>
+
+            {/* Confirm step — the ritual */}
+            <div className="rounded-xl border border-[var(--hairline)] bg-[var(--card)] px-4 py-3 flex items-center gap-3">
+              {pickerSelected ? (
+                <>
+                  <div className="min-w-0 flex-1 text-xs text-[var(--text-primary)]">
+                    Arm <span className="font-mono font-bold">{pickerSelected.code}</span>
+                    {pickerSelected.amount != null && <span className="text-[var(--text-muted)]"> ({pickerSelected.amount}% off)</span>}
+                    {' '}on <span className="font-semibold" dir="auto">{pickerCart.customer_name ?? 'Guest'}</span>'s cart?
+                  </div>
+                  <button onClick={() => { setPickerCart(null); setPickerSelected(null) }} className="btn btn-outline !text-xs !px-3 !py-1.5">Cancel</button>
+                  <button onClick={() => { const code = pickerSelected.code; setPickerCart(null); setPickerSelected(null); void attachExisting(pickerCart, code) }}
+                    className="btn btn-primary !text-xs !px-4 !py-1.5">
+                    Confirm attach
+                  </button>
+                </>
+              ) : (
+                <div className="text-xs text-[var(--text-muted)] flex-1">Select a coupon above to continue.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
