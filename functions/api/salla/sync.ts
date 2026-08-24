@@ -78,8 +78,13 @@ export async function onRequest(context: { request: Request; env: Record<string,
     } catch { return `${naive}Z` }
   }
 
-  // Helper: paginated GET from Salla API
+  // Helper: paginated GET from Salla API.
+  // Cloudflare allows ~50 subrequests per invocation; we budget them so
+  // every entity type gets its share instead of starving later sections.
+  let sallaCalls = 0
+  const SALLA_BUDGET = 42
   async function sallaGet(path: string, params: Record<string, string> = {}) {
+    if (++sallaCalls > SALLA_BUDGET) throw new Error("paused: sync budget reached (resumes next run)")
     const url = new URL(`${BASE}${path}`)
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
     const res = await fetch(url.toString(), { headers: sallaH, signal: AbortSignal.timeout(15000) })
@@ -102,7 +107,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
   try {
     let page = 1
     let total = 0
-    while (page <= 50) {
+    while (page <= 6) {
       const body = await sallaGet("/customers", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const c of list) {
@@ -134,7 +139,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
 
     let page = 1
     let total = 0
-    while (page <= 100) {
+    while (page <= 12) {
       const body = await sallaGet("/orders", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const o of list) {
@@ -174,7 +179,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
   try {
     let page = 1
     let total = 0
-    while (page <= 50) {
+    while (page <= 6) {
       const body = await sallaGet("/products", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const p of list) {
@@ -203,7 +208,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
   try {
     let page = 1
     let total = 0
-    while (page <= 20) {
+    while (page <= 4) {
       const body = await sallaGet("/feedbacks", { per_page: "50", type: "product", page: String(page) })
       const list = (body?.data ?? []) as any[]
       for (const r of list) {
@@ -230,7 +235,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
   try {
     let page = 1
     let total = 0
-    while (page <= 20) {
+    while (page <= 6) {
       const body = await sallaGet("/shipments", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const s of list) {
@@ -258,7 +263,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
   try {
     let page = 1
     let total = 0
-    while (page <= 10) {
+    while (page <= 5) {
       const body = await sallaGet("/carts/abandoned", { page: String(page), per_page: "60" })
       const list = (body?.data ?? []) as any[]
       for (const c of list) {
