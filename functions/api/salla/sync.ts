@@ -262,7 +262,22 @@ export async function onRequest(context: { request: Request; env: Record<string,
       if (page >= totalPages || list.length === 0) break
       page++
     }
-    await upsertMany("shipments", rows)
+    try {
+      await upsertMany("shipments", rows)
+    } catch (e) {
+      // Widened status constraint not applied yet? Retry with legacy buckets.
+      if (String((e as Error).message).includes("23514")) {
+        const LEGACY: Record<string, string> = {
+          creating: "creating", created: "created", delivered: "delivered",
+        }
+        const bucket = (raw: string): string => {
+          if (LEGACY[raw]) return LEGACY[raw]
+          if (["cancelled", "lost", "damaged", "return_to_origin", "return_in_progress"].includes(raw)) return "cancelled"
+          return "updated"
+        }
+        await upsertMany("shipments", rows.map((r) => ({ ...r, status: bucket(String(r.status)) })))
+      } else throw e
+    }
     results.shipments = `${rows.length} synced`
   } catch (e) { results.shipments = `error: ${String((e as Error).message).slice(0, 160)}` }
 
