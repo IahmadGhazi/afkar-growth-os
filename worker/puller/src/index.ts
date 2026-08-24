@@ -200,7 +200,63 @@ export async function runPull(env: any, opts: { now?: Date } = {}) {
     try { await job.run(); out.push({ platform: job.platform, status: "ok" }) }
     catch (e) { out.push({ platform: job.platform, status: "error", error: String((e as Error).message).slice(0, 200) }) }
   }
+
+  // ── SLA WATCHDOG: tattle on slow deliveries every run (3h cadence).
+  try { out.push(await runSlaSweep(env)) } catch (e) {
+    out.push({ platform: "sla_watchdog", status: "error", error: String((e as Error).message).slice(0, 160) })
+  }
   return { pulled: out, day }
+}
+
+/* ---- SLA WATCHDOG: orders still 'shipped' too long get flagged. ----
+   >24h in transit  → at_risk
+   >48h in transit  → delayed
+   Delivered/completed orders → resolved. Idempotent via upsert on order_id. */
+async function runSlaSweep(env: any): Promise<Record<string, unknown>> {
+  const H = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, "content-type": "application/json", prefer: "resolution=merge-duplicates,return=minimal" }
+  const GET = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` }
+  const now = Date.now()
+  const counts = { atRisk: 0, delayed: 0, resolved: 0 }
+
+  // Orders currently sitting in a shipped-ish state
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/orders?status=in.(shipped,in_transit,delivering,out_for_delivery)&select=id,date_created`, { headers: GET })
+  if (!res.ok) throw new Error(`sla read ${res.status}`)
+  const shipped = (await res.json()) as Array<{ id: string; date_created: string | null }>
+
+  const rows: Array<Record<string, unknown>> = []
+  for (const o of shipped) {
+    if (!o.date_created) continue
+    const ageH = (now - new Date(o.date_created).getTime()) / 3600_000
+    if (ageH > 48) rows.push({ id: `sla_${o.id}`, order_id: o.id, sla_state: "delayed", updated_at: new Date().toISOString() })
+    else if (ageH > 24) rows.push({ id: `sla_${o.id}`, order_id: o.id, sla_state: "at_risk", updated_at: new Date().toISOString() })
+  }
+  if (rows.length) {
+    const w = await fetch(`${env.SUPABASE_URL}/rest/v1/order_sla?on_conflict=order_id`, {
+      method: "POST", headers: H, body: JSON.stringify(rows),
+    })
+    if (!w.ok) throw new Error(`sla write ${w.status}: ${(await w.text()).slice(0, 120)}`)
+    counts.atRisk = rows.filter((r) => r.sla_state === "at_risk").length
+    counts.delayed = rows.filter((r) => r.sla_state === "delayed").length
+  }
+
+  // Auto-resolve: delivered/completed orders whose SLA is still open
+  const doneRes = await fetch(`${env.SUPABASE_URL}/rest/v1/order_sla?sla_state=in.(at_risk,delayed)&select=id,order_id`, { headers: GET })
+  if (doneRes.ok) {
+    const open = (await doneRes.json()) as Array<{ id: string; order_id: string }>
+    for (const s of open) {
+      const ordRes = await fetch(`${env.SUPABASE_URL}/rest/v1/orders?id=eq.${s.order_id}&select=status`, { headers: GET })
+      if (!ordRes.ok) continue
+      const st = ((await ordRes.json()) as Array<{ status?: string }>)[0]?.status
+      if (st && ["delivered", "completed", "canceled", "cancelled", "refunded", "deleted"].includes(st)) {
+        await fetch(`${env.SUPABASE_URL}/rest/v1/order_sla?on_conflict=order_id`, {
+          method: "POST", headers: H,
+          body: JSON.stringify([{ id: s.id, order_id: s.order_id, sla_state: "resolved", updated_at: new Date().toISOString() }]),
+        })
+        counts.resolved++
+      }
+    }
+  }
+  return { platform: "sla_watchdog", status: "ok", ...counts }
 }
 
 /* Scheduled entry + manual trigger via fetch (for the Sync-now button

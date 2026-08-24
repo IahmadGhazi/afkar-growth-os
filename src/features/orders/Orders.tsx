@@ -34,9 +34,10 @@ export function Orders() {
     const problems = shipments.filter((s) => PROBLEM_SHIP.has(s.status))
     const moving = shipments.filter((s) => IN_TRANSIT.has(s.status))
     const done = shipments.filter((s) => s.status === 'delivered' || s.status === 'partially_delivered')
-    return { problems: problems.length, moving: moving.length, delivered: done.length, hasAny: shipments.length > 0 }
+    const slaRisky = slas.filter((s) => s.sla_state === 'at_risk' || s.sla_state === 'delayed')
+    return { problems: problems.length, moving: moving.length, delivered: done.length, hasAny: shipments.length > 0, slaRisky: slaRisky.length }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shipments])
+  }, [shipments, slas])
 
   const intel = useMemo(() => computeCustomerIntel(customers, orders), [customers, orders])
   const customerById = useMemo(() => {
@@ -104,6 +105,12 @@ export function Orders() {
             <span className="flex items-center gap-1.5 font-semibold px-2 py-0.5 rounded-full"
               style={{ color: '#ef4444', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)' }}>
               <ShieldAlert size={12} /> {delivery.problems} need attention
+            </span>
+          )}
+          {delivery.slaRisky > 0 && (
+            <span className="flex items-center gap-1.5 font-semibold px-2 py-0.5 rounded-full"
+              style={{ color: '#f59e0b', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)' }}>
+              <Clock size={12} /> {delivery.slaRisky} past SLA
             </span>
           )}
         </div>

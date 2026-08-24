@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Search, ShoppingCart, Copy, Check, ExternalLink, MessageCircle, Phone, Flame, Clock, Snowflake, Trophy, RefreshCw } from 'lucide-react'
+import { Search, ShoppingCart, Copy, Check, ExternalLink, MessageCircle, Phone, Flame, Clock, Snowflake, Trophy, RefreshCw, TicketPercent } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { scopeSalla } from '../../lib/selectors'
 import { EmptyState } from '../../components/shared/ui'
 import { LiveBadge } from '../../components/shared/LiveBadge'
 import { toast } from '../../lib/toast'
+import { supabase } from '../../lib/supabase'
+import { refreshFromServer } from '../../lib/store'
 import type { AbandonedCart } from '../../types/database'
 
 type Temp = 'hot' | 'warm' | 'cold'
@@ -22,12 +24,61 @@ const TEMP_META: Record<Temp, { label: string; color: string; icon: typeof Flame
   cold: { label: 'Cooling off', color: '#64748b', icon: Snowflake },
 }
 
+/**
+ * Recovery message — Saudi dialect, built on proven persuasion psychology:
+ *  1. Personal warmth (حياك الله) → belonging, not a robot
+ *  2. Ownership framing ("سلتك انتظرتك") → endowment: it's already theirs
+ *  3. Concrete item list + price → re-anchors the value they chose
+ *  4. Scarcity ("الكمية محدودة") → loss aversion kicks in
+ *  5. Exclusive gift framing for the coupon (not "discount", but a GIFT) → reciprocity
+ *  6. Urgency with reason (ساري لفترة محدودة) → deadline without pressure
+ *  7. ONE tiny action ("بضغطة واحدة") → zero friction CTA
+ */
 function recoveryMessage(cart: AbandonedCart): string {
-  const name = (cart.customer_name ?? 'there').split(' ')[0]
-  const items = Array.isArray(cart.items) ? cart.items.map((i) => `${i.name} ×${i.quantity ?? 1}`).join(', ') : 'your items'
-  const total = Math.round(cart.cart_total).toLocaleString()
-  const link = cart.checkout_url ? `\n${cart.checkout_url}` : ''
-  return `Hi ${name} 👋\nYou left ${items} (${total} SAR) waiting in your cart at Afkar Modern.\nComplete your order before it sells out:${link}`
+  const name = (cart.customer_name ?? '').split(' ')[0] || 'أبو فلان'
+  const items = Array.isArray(cart.items) && cart.items.length > 0
+    ? cart.items.map((i) => `• ${i.name}${i.quantity && i.quantity > 1 ? ` ×${i.quantity}` : ''}`).join('\n')
+    : '• منتجاتك المختارة'
+  const total = `${Math.round(cart.cart_total).toLocaleString('ar-SA')} ر.س`
+  const link = cart.checkout_url ?? ''
+
+  const lines: string[] = []
+  lines.push(`حياك الله يا ${name} 👋`)
+  lines.push('')
+  lines.push('سلتك انتظرتك وما كملت الطلب:')
+  lines.push(items)
+  lines.push(`\n💰 الإجمالي: ${total}`)
+
+  if (cart.coupon_code) {
+    lines.push(`\n🎁 وخصمنا لك هدية خاصة: **${cart.coupon_code}**`)
+    lines.push('⏰ الكود ساري لفترة قصيرة فقط، لا يفوتك!')
+  } else {
+    lines.push('\n⚠️ الكمية محدودة ونفسنا توصلك قبل نفادها')
+  }
+
+  if (link) {
+    lines.push('\nأكمل طلبك بضغطة واحدة 👇')
+    lines.push(link)
+  }
+  lines.push('\n— فريق أفكار مودرن')
+  return lines.join('\n')
+}
+
+async function mintCoupon(cart: AbandonedCart, sbToken: string): Promise<{ ok: boolean; code?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/salla/coupons/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sbToken}` },
+      body: JSON.stringify({ cartId: cart.id, percentOff: 15, validHours: 48 }),
+    })
+    const body = await res.json().catch(() => ({}) as Record<string, unknown>)
+    if (!res.ok || !body.ok) {
+      return { ok: false, error: String(body.detail ?? body.error ?? `HTTP ${res.status}`).slice(0, 140) }
+    }
+    return { ok: true, code: String((body as { code?: string }).code ?? '') }
+  } catch (e) {
+    return { ok: false, error: String((e as Error).message).slice(0, 120) }
+  }
 }
 
 export function CartRecovery() {
@@ -62,9 +113,35 @@ export function CartRecovery() {
   const hotCarts = carts.filter((c) => tempOf(c) === 'hot')
   const contactedIds = new Set(carts.filter((c) => c.last_contacted_at).map((c) => c.id))
 
-  const copyMsg = async (cart: AbandonedCart) => {
+  // Optimistic coupon codes minted this session (server truth arrives via refresh)
+  const [minting, setMinting] = useState<Set<string>>(new Set())
+  const [freshCodes, setFreshCodes] = useState<Map<string, string>>(new Map())
+  const codeFor = (c: AbandonedCart): string | null => c.coupon_code ?? freshCodes.get(c.id) ?? null
+
+  const onMint = async (cart: AbandonedCart) => {
+    if (!supabase) { toast.error('Backend not configured'); return }
+    setMinting((prev) => new Set(prev).add(cart.id))
     try {
-      await navigator.clipboard.writeText(recoveryMessage(cart))
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) { toast.error('Sign in required'); return }
+      const result = await mintCoupon(cart, token)
+      if (result.ok && result.code) {
+        setFreshCodes((prev) => new Map(prev).set(cart.id, result.code!))
+        toast.success(`Coupon ${result.code} is live in your store — 15% for 48h`)
+        void refreshFromServer()
+      } else {
+        toast.error(`Coupon failed: ${result.error}`)
+      }
+    } finally {
+      setMinting((prev) => { const n = new Set(prev); n.delete(cart.id); return n })
+    }
+  }
+
+  const copyMsg = async (cart: AbandonedCart, codeOverride?: string | null) => {
+    try {
+      const msg = recoveryMessage(codeOverride ? { ...cart, coupon_code: codeOverride } : cart)
+      await navigator.clipboard.writeText(msg)
       setCopied(cart.id)
       setTimeout(() => setCopied(null), 1500)
       toast.success('Recovery message copied')
@@ -73,12 +150,13 @@ export function CartRecovery() {
     }
   }
 
-  const openWhatsApp = (cart: AbandonedCart) => {
+  const openWhatsApp = (cart: AbandonedCart, codeOverride?: string | null) => {
     const mobile = (cart.customer_mobile ?? '').replace(/[^\d+]/g, '')
     if (!mobile) { toast.error('No phone number on this cart'); return }
     let intl = mobile.startsWith('+') ? mobile.slice(1) : mobile
     if (intl.startsWith('00')) intl = intl.slice(2)
-    window.open(`https://wa.me/${intl}?text=${encodeURIComponent(recoveryMessage(cart))}`, '_blank', 'noopener')
+    const msg = recoveryMessage(codeOverride ? { ...cart, coupon_code: codeOverride } : cart)
+    window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener')
   }
 
   return (
@@ -160,12 +238,14 @@ export function CartRecovery() {
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-[var(--text-primary)] truncate">{cart.customer_name ?? 'Guest'}</span>
+                      <span className="text-sm font-semibold text-[var(--text-primary)] truncate" dir="auto">{cart.customer_name ?? 'Guest'}</span>
                       {contacted && (
                         <span className="badge bg-[var(--positive-soft)] text-[var(--positive)] text-[9px]"><Check size={9} /> contacted</span>
                       )}
-                      {cart.coupon_code && (
-                        <span className="badge bg-[var(--warning-soft)] text-[var(--warning)] text-[9px]">has coupon</span>
+                      {codeFor(cart) && (
+                        <span className="badge text-[9px] font-mono" style={{ background: 'rgba(37,211,102,.12)', color: '#25D366', border: '1px solid rgba(37,211,102,.3)' }}>
+                          <TicketPercent size={9} /> {codeFor(cart)}
+                        </span>
                       )}
                     </div>
                     <div className="text-xs text-[var(--text-muted)] truncate mt-0.5" dir="auto">
@@ -185,6 +265,13 @@ export function CartRecovery() {
                     <span className="text-base font-bold text-[var(--text-primary)] tabular-nums mr-1">
                       {Math.round(cart.cart_total).toLocaleString()} <span className="text-xs font-medium opacity-60">SAR</span>
                     </span>
+                    {!codeFor(cart) && (
+                      <button onClick={() => onMint(cart)} disabled={minting.has(cart.id)}
+                        title="Mint a 15% / 48h coupon in your Salla store and attach it"
+                        className="btn !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5" style={{ background: 'rgba(240,196,46,.12)', color: '#d29a0c', border: '1px solid rgba(210,154,12,.3)' }}>
+                        <TicketPercent size={13} /> {minting.has(cart.id) ? 'Minting…' : 'Coupon'}
+                      </button>
+                    )}
                     {cart.checkout_url && (
                       <a href={cart.checkout_url} target="_blank" rel="noopener noreferrer"
                         title="Open customer's checkout link"
@@ -192,11 +279,11 @@ export function CartRecovery() {
                         <ExternalLink size={12} /> Checkout
                       </a>
                     )}
-                    <button onClick={() => openWhatsApp(cart)} title="Send WhatsApp recovery message"
+                    <button onClick={() => openWhatsApp(cart, codeFor(cart))} title="Send WhatsApp recovery message (Arabic)"
                       className="btn !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5" style={{ background: 'rgba(37,211,102,.14)', color: '#25D366', border: '1px solid rgba(37,211,102,.3)' }}>
                       <MessageCircle size={13} /> WhatsApp
                     </button>
-                    <button onClick={() => copyMsg(cart)} title="Copy recovery message"
+                    <button onClick={() => copyMsg(cart, codeFor(cart))} title="Copy Arabic recovery message"
                       className="btn !px-2.5 !py-1.5 text-xs inline-flex items-center">
                       {copied === cart.id ? <Check size={13} className="text-[var(--positive)]" /> : <Copy size={13} />}
                     </button>
