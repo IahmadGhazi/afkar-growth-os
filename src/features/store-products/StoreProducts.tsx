@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
-import { Search, Package, PackageX, Star, AlertTriangle } from 'lucide-react'
+import { Search, Package, PackageX, Star, AlertTriangle, TicketPercent } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { scopeSalla } from '../../lib/selectors'
 import { EmptyState } from '../../components/shared/ui'
 import { LiveBadge } from '../../components/shared/LiveBadge'
+import { CouponsManager } from '../coupons/CouponsManager'
 
 export function StoreProducts() {
   const { state } = useApp()
+  const [tab, setTab] = useState<'catalog' | 'coupons'>('catalog')
   const [search, setSearch] = useState('')
   const products = useMemo(
     () => scopeSalla(state, state.sallaProducts),
@@ -32,11 +34,29 @@ export function StoreProducts() {
         <div>
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">Products</h2>
           <div className="text-sm text-[var(--text-muted)]">
-            {products.filter((p) => p.status === 'active').length} active · {lowStock.length} low stock
+            {tab === 'catalog'
+              ? `${products.filter((p) => p.status === 'active').length} active · ${lowStock.length} low stock`
+              : 'Discount codes living in your Salla store'}
           </div>
         </div>
       </div>
 
+      {/* Sub-tabs */}
+      <div className="flex gap-2">
+        <button onClick={() => setTab('catalog')} className={`chip !px-4 !py-1.5 ${tab === 'catalog' ? 'font-bold' : ''}`}
+          style={tab === 'catalog' ? { borderColor: '#d29a0c88', color: '#d29a0c', background: 'rgba(240,196,46,.12)' } : undefined}>
+          <Package size={12} className="inline mr-1" /> Catalog
+        </button>
+        <button onClick={() => setTab('coupons')} className={`chip !px-4 !py-1.5 ${tab === 'coupons' ? 'font-bold' : ''}`}
+          style={tab === 'coupons' ? { borderColor: '#d29a0c88', color: '#d29a0c', background: 'rgba(240,196,46,.12)' } : undefined}>
+          <TicketPercent size={12} className="inline mr-1" /> Coupons
+        </button>
+      </div>
+
+      {tab === 'coupons' ? (
+        <CouponsManager />
+      ) : (
+        <>
       <LiveBadge />
 
       {/* Best sellers + low stock alerts */}
@@ -139,6 +159,8 @@ export function StoreProducts() {
             )
           })}
         </div>
+      )}
+        </>
       )}
     </div>
   )

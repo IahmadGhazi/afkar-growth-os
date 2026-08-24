@@ -351,10 +351,12 @@ export async function onRequest(context: { request: Request; env: Record<string,
         await announce(env, { table: "reviews", row_id: `rev_salla_${r.id}` })
         break
       }
-      // ── Abandoned carts: recovery engine fuel (aliases cover portal naming variants)
+      // ── Abandoned carts: recovery engine fuel (docs event name: abandoned.cart)
+      case "abandoned.cart":
       case "cart.abandoned":
       case "abandoned_cart.created":
       case "cart.created":
+      case "abandoned.cart.update":
       case "abandoned_cart.updated":
       case "cart.updated": {
         const c = data as Record<string, any>
@@ -390,6 +392,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
         }
         break
       }
+      case "abandoned.cart.purchased":
       case "abandoned_cart.purchased":
       case "cart.converted":
       case "abandoned_cart.status.changed": {

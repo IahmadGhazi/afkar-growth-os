@@ -64,12 +64,12 @@ function recoveryMessage(cart: AbandonedCart): string {
   return lines.join('\n')
 }
 
-async function mintCoupon(cart: AbandonedCart, sbToken: string): Promise<{ ok: boolean; code?: string; error?: string }> {
+async function mintCoupon(cart: AbandonedCart, sbToken: string, percentOff: number, validHours: number): Promise<{ ok: boolean; code?: string; error?: string; cartUpdated?: boolean }> {
   try {
     const res = await fetch('/api/salla/coupons/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sbToken}` },
-      body: JSON.stringify({ cartId: cart.id, percentOff: 15, validHours: 48 }),
+      body: JSON.stringify({ cartId: cart.id, percentOff, validHours }),
     })
     const body = await res.json().catch(() => ({}) as Record<string, unknown>)
     if (!res.ok || !body.ok) {
@@ -79,7 +79,7 @@ async function mintCoupon(cart: AbandonedCart, sbToken: string): Promise<{ ok: b
       }
       return { ok: false, error: raw.slice(0, 140) }
     }
-    return { ok: true, code: String((body as { code?: string }).code ?? '') }
+    return { ok: true, code: String((body as { code?: string }).code ?? ''), cartUpdated: Boolean((body as { cartUpdated?: boolean }).cartUpdated) }
   } catch (e) {
     return { ok: false, error: String((e as Error).message).slice(0, 120) }
   }
@@ -120,6 +120,9 @@ export function CartRecovery() {
   // Optimistic coupon codes minted this session (server truth arrives via refresh)
   const [minting, setMinting] = useState<Set<string>>(new Set())
   const [freshCodes, setFreshCodes] = useState<Map<string, string>>(new Map())
+  // Coupon strength — YOU choose the discount, nothing is auto-decided
+  const [percent, setPercent] = useState(10)
+  const [validHours, setValidHours] = useState(48)
   const codeFor = (c: AbandonedCart): string | null => c.coupon_code ?? freshCodes.get(c.id) ?? null
 
   const onMint = async (cart: AbandonedCart) => {
@@ -129,10 +132,14 @@ export function CartRecovery() {
       const { data } = await supabase.auth.getSession()
       const token = data.session?.access_token
       if (!token) { toast.error('Sign in required'); return }
-      const result = await mintCoupon(cart, token)
+      const result = await mintCoupon(cart, token, percent, validHours)
       if (result.ok && result.code) {
         setFreshCodes((prev) => new Map(prev).set(cart.id, result.code!))
-        toast.success(`Coupon ${result.code} is live in your store — 15% for 48h`)
+        if (result.cartUpdated === false) {
+          toast.error(`Coupon ${result.code} created but couldn't attach to this cart — see Coupons tab in Products`)
+        } else {
+          toast.success(`Coupon ${result.code} is live — ${percent}% for ${validHours}h`)
+        }
         void refreshFromServer()
       } else {
         toast.error(`Coupon failed: ${result.error}`)
@@ -210,6 +217,31 @@ export function CartRecovery() {
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search customer, phone or product…" className="field !pl-9" />
+      </div>
+
+      {/* Coupon strength toolbar — you decide the discount */}
+      <div className="glass-card px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          <TicketPercent size={12} /> Coupon strength
+        </span>
+        <div className="flex gap-1.5">
+          {[5, 10, 15, 20, 25].map((p) => (
+            <button key={p} onClick={() => setPercent(p)}
+              className={`chip !px-2.5 !py-1 text-xs ${percent === p ? 'font-bold' : ''}`}
+              style={percent === p ? { borderColor: '#d29a0c88', color: '#d29a0c', background: 'rgba(240,196,46,.12)' } : undefined}>
+              {p}%
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1.5">
+          {[[24, '1 day'], [48, '2 days'], [168, '1 week']].map(([h, label]) => (
+            <button key={h} onClick={() => setValidHours(h as number)}
+              className={`chip !px-2.5 !py-1 text-xs ${validHours === h ? 'font-bold' : ''}`}
+              style={validHours === h ? { borderColor: '#d29a0c88', color: '#d29a0c', background: 'rgba(240,196,46,.12)' } : undefined}>
+              {label as string}
+            </button>
+          ))}
+        </div>
       </div>
 
       {filtered.length === 0 ? (
