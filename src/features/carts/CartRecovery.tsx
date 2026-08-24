@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, ShoppingCart, Copy, Check, ExternalLink, MessageCircle, Phone, Flame, Clock, Snowflake, Trophy, RefreshCw, TicketPercent, Brain } from 'lucide-react'
+import { Search, ShoppingCart, Copy, Check, ExternalLink, MessageCircle, Phone, Flame, Clock, Snowflake, Trophy, RefreshCw, TicketPercent, Brain, X } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { scopeSalla } from '../../lib/selectors'
 import { EmptyState } from '../../components/shared/ui'
@@ -128,9 +128,34 @@ export function CartRecovery() {
   // Coupon strength — YOU decide; the Brain advises per-row
   const [percent, setPercent] = useState(10)
   const [validHours, setValidHours] = useState(48)
+  const [customPct, setCustomPct] = useState<string>('')
+  const [customHrs, setCustomHrs] = useState<string>('')
   const [rowOverrides, setRowOverrides] = useState<Map<string, { percent: number; hours: number }>>(new Map())
+  const [allCoupons, setAllCoupons] = useState<Array<{ id: number; code: string; amount: number | null; name?: string | null; status: string; expiryDate?: string | null; isGroup?: boolean }>>([])
   const [activeCoupons, setActiveCoupons] = useState<Array<{ id: number; code: string; amount: number | null; name?: string | null; expiryDate?: string | null; usage?: { times: number | null } }>>([])
   const codeFor = (c: AbandonedCart): string | null => c.coupon_code ?? freshCodes.get(c.id) ?? null
+
+  /** Status of an armed code: live / expired / unknown (paused or deleted) */
+  const codeHealth = (code: string | null): 'live' | 'expired' | 'unknown' | 'none' => {
+    if (!code) return 'none'
+    const hit = allCoupons.find((c) => c.code === code)
+    if (!hit) return 'unknown'
+    if (hit.status !== 'active') return 'expired'
+    if (hit.expiryDate && new Date(hit.expiryDate.replace(' ', 'T')).getTime() < Date.now()) return 'expired'
+    return 'live'
+  }
+
+  const detachCoupon = async (cart: AbandonedCart) => {
+    const code = codeFor(cart)
+    if (!code) return
+    if (!window.confirm(`Remove ${code} from ${cart.customer_name ?? 'this cart'}?\n\nThe coupon stays alive in your store (manage it in Products → Coupons) — it just detaches from this cart.`)) return
+    if (!supabase) return
+    const res = await supabase.from('abandoned_carts').update({ coupon_code: null }).eq('id', cart.id)
+    if (res.error) { toast.error(`Detach failed: ${res.error.message}`); return }
+    setFreshCodes((prev) => { const n = new Map(prev); n.delete(cart.id); return n })
+    toast.success(`${code} detached — cart is coupon-free again`)
+    void refreshFromServer()
+  }
 
   const intel = useMemo(() => computeCustomerIntel(state.sallaCustomers ?? [], state.sallaOrders ?? []), [state.sallaCustomers, state.sallaOrders])
   const intelByCustomer = useMemo(() => {
@@ -149,9 +174,11 @@ export function CartRecovery() {
         const res = await fetch('/api/salla/coupons', { headers: { Authorization: `Bearer ${data.session.access_token}` } })
         const body = await res.json()
         if (res.ok && body.ok) {
-          setActiveCoupons((body.coupons as Array<{ id: number; code: string; amount: number | null; status: string; expiryDate: string | null }>)
-            .filter((c) => c.status === 'active' && (!c.expiryDate || new Date(c.expiryDate.replace(' ', 'T')).getTime() > Date.now()))
-            .map((c) => ({ id: c.id, code: c.code, amount: c.amount })))
+          const all = body.coupons as Array<{ id: number; code: string; amount: number | null; name?: string | null; status: string; expiryDate: string | null; isGroup: boolean; usage?: { times: number | null } }>
+          setAllCoupons(all)
+          setActiveCoupons(all
+            .filter((c) => c.status === 'active' && !c.isGroup && (!c.expiryDate || new Date(c.expiryDate.replace(' ', 'T')).getTime() > Date.now()))
+            .map((c) => ({ id: c.id, code: c.code, amount: c.amount, name: c.name, expiryDate: c.expiryDate, usage: c.usage })))
         }
       } catch { /* picker is optional */ }
     })()
@@ -258,6 +285,7 @@ export function CartRecovery() {
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">Cart Recovery</h2>
           <div className="text-sm text-[var(--text-muted)]">
             {carts.length} live carts · {potentialValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} SAR on the table
+            · <span className="text-[var(--positive)] font-semibold">{allCarts.filter((c) => c.status === 'purchased').length} rescued</span> all-time 🏆
           </div>
         </div>
       </div>
@@ -305,23 +333,29 @@ export function CartRecovery() {
         <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
           <TicketPercent size={12} /> Coupon strength
         </span>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 items-center">
           {[5, 10, 15, 20, 25].map((p) => (
-            <button key={p} onClick={() => setPercent(p)}
-              className={`chip !px-2.5 !py-1 text-xs ${percent === p ? 'font-bold' : ''}`}
-              style={percent === p ? { borderColor: '#d29a0c88', color: '#d29a0c', background: 'rgba(240,196,46,.12)' } : undefined}>
+            <button key={p} onClick={() => { setPercent(p); setCustomPct('') }}
+              className={`chip !px-2.5 !py-1 text-xs ${percent === p && !customPct ? 'font-bold' : ''}`}
+              style={percent === p && !customPct ? { borderColor: '#d29a0c88', color: '#d29a0c', background: 'rgba(240,196,46,.12)' } : undefined}>
               {p}%
             </button>
           ))}
+          <input type="number" min={1} max={90} placeholder="custom %" value={customPct}
+            onChange={(e) => { const v = e.target.value; setCustomPct(v); if (v && Number(v) >= 1) setPercent(Math.min(90, Math.max(1, Number(v)))) }}
+            className="field !w-20 !py-1 !text-xs tabular-nums" title="Custom discount %" />
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 items-center">
           {[[24, '1 day'], [48, '2 days'], [168, '1 week']].map(([h, label]) => (
-            <button key={h} onClick={() => setValidHours(h as number)}
+            <button key={h} onClick={() => { setValidHours(h as number); setCustomHrs('') }}
               className={`chip !px-2.5 !py-1 text-xs ${validHours === h ? 'font-bold' : ''}`}
               style={validHours === h ? { borderColor: '#d29a0c88', color: '#d29a0c', background: 'rgba(240,196,46,.12)' } : undefined}>
               {label as string}
             </button>
           ))}
+          <input type="number" min={1} max={2160} placeholder="custom h" value={customHrs}
+            onChange={(e) => { const v = e.target.value; setCustomHrs(v); if (v && Number(v) >= 1) setValidHours(Math.min(2160, Number(v))) }}
+            className="field !w-20 !py-1 !text-xs tabular-nums" title="Custom hours" />
         </div>
         {armable.length > 1 && (
           <button onClick={() => void batchArm()} disabled={batching}
@@ -372,11 +406,26 @@ export function CartRecovery() {
                       {contacted && (
                         <span className="badge bg-[var(--positive-soft)] text-[var(--positive)] text-[9px]"><Check size={9} /> contacted</span>
                       )}
-                      {codeFor(cart) && (
-                        <span className="badge text-[9px] font-mono" style={{ background: 'rgba(37,211,102,.12)', color: '#25D366', border: '1px solid rgba(37,211,102,.3)' }}>
-                          <TicketPercent size={9} /> {codeFor(cart)}
-                        </span>
-                      )}
+                      {codeFor(cart) && (() => {
+                        const health = codeHealth(codeFor(cart))
+                        const style = health === 'live'
+                          ? { background: 'rgba(37,211,102,.12)', color: '#25D366', border: '1px solid rgba(37,211,102,.3)' }
+                          : health === 'expired'
+                            ? { background: 'rgba(239,68,68,.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,.3)' }
+                            : { background: 'rgba(245,158,11,.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,.3)' }
+                        return (
+                          <span className="badge text-[9px] font-mono inline-flex items-center gap-1" style={style}
+                            title={health === 'expired' ? 'This coupon expired or was paused — detach it and arm a fresh one' : health === 'unknown' ? 'Coupon not found in store (deleted?) — detach it' : 'Live coupon attached'}>
+                            <TicketPercent size={9} /> {codeFor(cart)}
+                            {health !== 'live' && <span className="font-sans font-semibold">{health === 'expired' ? 'dead' : '??'}</span>}
+                            <button onClick={(e) => { e.stopPropagation(); void detachCoupon(cart) }}
+                              className="opacity-60 hover:opacity-100 ml-0.5" title="Remove coupon from this cart"
+                              style={{ color: 'inherit' }}>
+                              <X size={10} />
+                            </button>
+                          </span>
+                        )
+                      })()}
                     </div>
                     <div className="text-xs text-[var(--text-muted)] truncate mt-0.5" dir="auto">
                       {Array.isArray(cart.items) && cart.items.length > 0

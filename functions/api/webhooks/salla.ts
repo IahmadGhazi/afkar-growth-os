@@ -382,7 +382,9 @@ export async function onRequest(context: { request: Request; env: Record<string,
           customer_name: c.customer?.name ?? null,
           customer_mobile: c.customer?.mobile ? `${c.customer.mobile_code ?? ""}${c.customer.mobile}` : null,
           customer_email: c.customer?.email ?? null,
-          coupon_code: c.coupon?.code ?? null,
+          // NEVER clobber our attached code when Salla's cart has none —
+          // cart.update events fire on every touch and would wipe it.
+          ...(c.coupon?.code ? { coupon_code: String(c.coupon.code) } : {}),
           age_minutes: num(c.age_in_minutes),
         }
         try {
