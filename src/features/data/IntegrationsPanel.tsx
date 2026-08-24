@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { RefreshCw, Check, ChevronDown, ShieldCheck, Lock, AlertTriangle, Zap } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { refreshFromServer } from '../../lib/store'
 import {
   PLATFORM_SETUP, PLATFORM_META, SECURITY_NOTES,
   DIFFICULTY_LABEL, type PlatformId,
@@ -54,6 +55,7 @@ export function IntegrationsPanel() {
             : 'Sync complete.',
         }))
         void load()
+        void refreshFromServer()
       } else {
         setSyncMessages((m) => ({ ...m, [platform]: json.message ?? json.error ?? `Failed (${res.status})` }))
       }

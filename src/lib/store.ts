@@ -153,7 +153,8 @@ const backend = new Proxy(rawBackend, {
 })
 
 /** Re-pull server truth (used after failures and for future live sync). */
-async function refreshFromServer() {
+/** Re-pull server truth (used after failures, sync, and manual refresh). */
+export async function refreshFromServer() {
   if (refreshing || !rawBackend.available) return
   refreshing = true
   try {
