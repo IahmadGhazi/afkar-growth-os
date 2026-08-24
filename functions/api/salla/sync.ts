@@ -119,6 +119,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
           : typeof o.customer_id === "number" ? o.customer_id : null
         await upsert("orders", {
           id: `ord_salla_${o.id}`, client_id: clientId, salla_id: o.id,
+          reference: o.reference_id != null ? String(o.reference_id) : null,
           customer_id: sallaCustId ? (custMap.get(sallaCustId) ?? null) : null,
           status: typeof o.status === "string" ? o.status : (o.status?.slug ?? o.status?.name ?? "payment_completed"),
           payment_method: typeof o.payment_method === "string" ? o.payment_method : (o.payment_method?.slug ?? null),

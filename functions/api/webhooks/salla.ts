@@ -163,6 +163,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
         const sallaCustId = typeof o.customer?.id === "number" ? o.customer.id : typeof o.customer_id === "number" ? o.customer_id : null
         await upsert("orders", {
           id: orderId, client_id: clientId, salla_id: o.id,
+          reference: o.reference_id != null ? String(o.reference_id) : null,
           customer_id: sallaCustId ? (cm.get(sallaCustId) ?? null) : null,
           status: statusOf(o.status),
           payment_method: typeof o.payment_method === "string" ? o.payment_method : (o.payment_method?.slug ?? null),
@@ -181,7 +182,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
         })
         await fetch(`${env.SUPABASE_URL}/rest/v1/order_timeline`, {
           method: "POST", headers: H,
-          body: JSON.stringify({ id: eventId, order_id: orderId, client_id: clientId, event: body.event, details: {}, event_time: now }),
+          body: JSON.stringify({ id: eventId, order_id: orderId, client_id: clientId, event: body.event, details: { id: o.id ?? null, reference_id: o.reference_id ?? null }, event_time: now }),
         })
         await announce(env, { table: "orders", row_id: orderId })
         break

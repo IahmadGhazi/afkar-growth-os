@@ -43,7 +43,7 @@ export function Orders() {
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter((o) => {
-        if (String(o.salla_id ?? '').includes(q)) return true
+        if (String(o.salla_id ?? '').includes(q) || (o.reference ?? '').includes(q)) return true
         const cust = o.customer_id ? customerById.get(o.customer_id)?.customer : null
         if (cust && `${cust.first_name} ${cust.last_name}`.toLowerCase().includes(q)) return true
         if (Array.isArray(o.items) && o.items.some((it) => itemName(it as { name?: string }).toLowerCase().includes(q))) return true
@@ -134,7 +134,10 @@ export function Orders() {
                   {/* Order id + exact time */}
                   <div className="min-w-[150px]">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-[var(--text-primary)] tabular-nums">#{String(o.salla_id ?? o.id).replace('ord_salla_', '')}</span>
+                      <span className="text-sm font-bold text-[var(--text-primary)] tabular-nums">#{o.reference ?? String(o.salla_id ?? o.id).replace('ord_salla_', '')}</span>
+                      {o.reference && (
+                        <span className="text-[10px] text-[var(--text-muted)] tabular-nums" title="Internal Salla id">id {o.salla_id}</span>
+                      )}
                       <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
                         style={{ color: meta.color, background: `${meta.color}1f`, border: `1px solid ${meta.color}44` }}>
                         {meta.label}

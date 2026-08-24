@@ -1345,4 +1345,19 @@ function startLiveSync() {
       void refreshFromServer()
     }, 25_000)
   }
+
+  // ── Instant catch-up when the tab wakes up: covers sleep/wake, tab
+  // switches and network reconnects where a push may have been missed.
+  const catchUp = () => {
+    if (document.hidden) return
+    if (refreshTimer) clearTimeout(refreshTimer)
+    refreshTimer = setTimeout(() => refreshFromServer(), 250)
+  }
+  if (!catchupWired) {
+    catchupWired = true
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) catchUp() })
+    window.addEventListener('focus', catchUp)
+    window.addEventListener('online', catchUp)
+  }
 }
+let catchupWired = false

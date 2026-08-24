@@ -244,6 +244,8 @@ export interface SallaOrder {
   id: string
   client_id: string
   salla_id: number | null
+  /** Merchant-facing order number shown in the Salla dashboard (custom numbering). */
+  reference?: string | null
   customer_id: string | null
   status: string
   payment_method: string | null
