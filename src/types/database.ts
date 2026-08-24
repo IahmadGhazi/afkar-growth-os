@@ -216,6 +216,99 @@ export interface PlatformAccount {
   created_at: string
 }
 
+export interface SallaCustomer {
+  id: string
+  client_id: string
+  salla_id: number | null
+  first_name: string | null
+  last_name: string | null
+  mobile: string | null
+  mobile_code: string | null
+  email: string | null
+  gender: string | null
+  city: string | null
+  country: string | null
+  avatar_url: string | null
+  total_orders: number
+  total_spent: number
+  loyalty_points: number
+  first_order_date: string | null
+  last_order_date: string | null
+  tags: string[] | null
+  groups: string[] | null
+  is_active: boolean
+  synced_at: string
+}
+
+export interface SallaOrder {
+  id: string
+  client_id: string
+  salla_id: number | null
+  customer_id: string | null
+  status: string
+  payment_method: string | null
+  selling_channel: string | null
+  total_amount: number
+  shipping_cost: number
+  tax_amount: number
+  currency: string
+  items_count: number
+  items: Array<{ name: string; qty: number; price: number }> | null
+  date_created: string | null
+  date_completed: string | null
+  synced_at: string
+}
+
+export interface SallaProduct {
+  id: string
+  client_id: string
+  salla_id: number | null
+  name: string
+  sku: string | null
+  price: number | null
+  sale_price: number | null
+  status: 'active' | 'hidden' | 'out_of_stock'
+  category: string | null
+  image_url: string | null
+  quantity: number
+  views: number
+  sales_count: number
+  rating_avg: number | null
+  reviews_count: number
+  synced_at: string
+}
+
+export interface SallaReview {
+  id: string
+  client_id: string
+  salla_id: number | null
+  type: 'product' | 'shipping' | 'store' | 'blog' | 'ask'
+  rating: number | null
+  content: string | null
+  customer_name: string | null
+  product_name: string | null
+  order_reference: string | null
+  is_published: boolean
+  likes_count: number
+  images: string[] | null
+  created_at: string
+}
+
+export interface IntegrationToken {
+  id: string
+  client_id: string
+  platform: 'salla' | 'google_ads' | 'tiktok_ads' | 'snap_ads'
+  access_token: string
+  refresh_token: string
+  expires_at: string
+  store_id: string | null
+  store_name: string | null
+  merchant_id: number | null
+  scope: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type ProductStatus =
   | 'discovered'
   | 'filtered'

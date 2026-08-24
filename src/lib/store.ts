@@ -65,6 +65,10 @@ function emptyState(): AppState {
     campaignMetrics: [],
     taskComments: [],
     reportNotes: [],
+    sallaCustomers: [],
+    sallaOrders: [],
+    sallaProducts: [],
+    sallaReviews: [],
     currentUserId: null,
     currentClientId: null,
     ready: false,
@@ -172,6 +176,10 @@ async function refreshFromServer() {
       campaignMetrics: data.campaignMetrics,
       taskComments: data.taskComments,
       reportNotes: data.reportNotes,
+      sallaCustomers: data.sallaCustomers,
+      sallaOrders: data.sallaOrders,
+      sallaProducts: data.sallaProducts,
+      sallaReviews: data.sallaReviews,
     }))
     sweepOverdue()
   } catch (err) {

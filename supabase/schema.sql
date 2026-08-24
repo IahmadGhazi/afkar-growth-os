@@ -241,6 +241,129 @@ create table if not exists public.product_candidates (
   updated_at timestamptz not null default now()
 );
 
+-- ---------- PLATFORM ACCOUNTS (ad account registry for puller) ----------
+create table if not exists public.platform_accounts (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  platform text not null check (platform in ('google_ads','tiktok_ads','snap_ads','salla')),
+  account_id text not null,
+  label text,
+  created_at timestamptz not null default now(),
+  unique (client_id, platform, account_id)
+);
+
+-- ---------- SALLA CUSTOMERS ----------
+create table if not exists public.customers (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  salla_id integer unique,
+  first_name text,
+  last_name text,
+  mobile text,
+  mobile_code text,
+  email text,
+  gender text,
+  city text,
+  country text,
+  avatar_url text,
+  total_orders integer not null default 0,
+  total_spent numeric not null default 0,
+  loyalty_points integer not null default 0,
+  first_order_date date,
+  last_order_date date,
+  tags jsonb not null default '[]'::jsonb,
+  groups jsonb not null default '[]'::jsonb,
+  is_active boolean not null default true,
+  synced_at timestamptz not null default now()
+);
+
+-- ---------- SALLA ORDERS ----------
+create table if not exists public.orders (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  salla_id integer unique,
+  customer_id text references public.customers(id) on delete set null,
+  status text not null default 'payment_completed',
+  payment_method text,
+  selling_channel text,
+  total_amount numeric not null default 0,
+  shipping_cost numeric not null default 0,
+  tax_amount numeric not null default 0,
+  currency text not null default 'SAR',
+  items_count integer not null default 0,
+  items jsonb not null default '[]'::jsonb,
+  date_created timestamptz,
+  date_completed timestamptz,
+  synced_at timestamptz not null default now()
+);
+
+-- ---------- SALLA STORE PRODUCTS (the real catalog) ----------
+create table if not exists public.store_products (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  salla_id integer unique,
+  name text not null,
+  sku text,
+  price numeric,
+  sale_price numeric,
+  status text not null default 'active' check (status in ('active','hidden','out_of_stock')),
+  category text,
+  image_url text,
+  quantity integer not null default 0,
+  views integer not null default 0,
+  sales_count integer not null default 0,
+  rating_avg numeric,
+  reviews_count integer not null default 0,
+  synced_at timestamptz not null default now()
+);
+
+-- ---------- SALLA REVIEWS ----------
+create table if not exists public.reviews (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  salla_id integer unique,
+  type text not null default 'product' check (type in ('product','shipping','store','blog','ask')),
+  rating integer check (rating between 1 and 5),
+  content text,
+  customer_name text,
+  product_name text,
+  order_reference text,
+  is_published boolean not null default true,
+  likes_count integer not null default 0,
+  images jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+-- ---------- INTEGRATION TOKENS (server-side only, never exposed to browser) ----------
+create table if not exists public.integration_tokens (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  platform text not null check (platform in ('salla','google_ads','tiktok_ads','snap_ads')),
+  access_token text not null,
+  refresh_token text not null,
+  expires_at timestamptz not null,
+  store_id text,
+  store_name text,
+  merchant_id integer,
+  scope text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (client_id, platform)
+);
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  name text not null,
+  platform text not null default 'other' check (platform in ('google_ads','tiktok_ads','snap_ads','salla','other')),
+  status text not null default 'planned' check (status in ('planned','active','paused','completed','archived')),
+  budget numeric,
+  objective text,
+  start_date date,
+  end_date date,
+  created_by text references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- ---------- CAMPAIGNS ----------
 create table if not exists public.campaigns (
   id text primary key,
@@ -508,30 +631,40 @@ do $$ begin
   create policy "team full access sync_runs" on public.sync_runs for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
 
+-- RLS for new Salla integration tables
+do $$ begin
+  alter table public.customers enable row level security;
+  alter table public.orders enable row level security;
+  alter table public.store_products enable row level security;
+  alter table public.reviews enable row level security;
+  alter table public.integration_tokens enable row level security;
+exception when others then null; end $$;
+
+do $$ begin
+  create policy "team full access customers" on public.customers for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
+  create policy "team full access orders" on public.orders for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
+  create policy "team full access store_products" on public.store_products for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
+  create policy "team full access reviews" on public.reviews for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
+  create policy "team full access integration_tokens" on public.integration_tokens for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
+  create policy "team full access platform_accounts" on public.platform_accounts for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+
 -- client_reports policies (new table, hardened pattern)
 do $$ begin
   drop policy if exists "anon full access client_reports" on public.client_reports;
 exception when others then null; end $$;
 do $$ begin
   create policy "team full access client_reports" on public.client_reports for all to authenticated using (true) with check (true);
-exception when duplicate_object then null; when others then null; end $$;
-
--- platform_accounts policies (new table, hardened pattern)
-create table if not exists public.platform_accounts (
-  id text primary key,
-  client_id text not null references public.clients(id) on delete cascade,
-  platform text not null check (platform in ('google_ads','tiktok_ads','snap_ads','salla')),
-  account_id text not null,
-  label text,
-  created_at timestamptz not null default now(),
-  unique (client_id, platform, account_id)
-);
-alter table public.platform_accounts enable row level security;
-do $$ begin
-  drop policy if exists "anon full access platform_accounts" on public.platform_accounts;
-exception when others then null; end $$;
-do $$ begin
-  create policy "team full access platform_accounts" on public.platform_accounts for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
 
 -- ============================================================
@@ -785,6 +918,39 @@ insert into public.campaign_metrics (id, campaign_id, client_id, date, impressio
   ('cm_1a', 'camp_1', 'cli_afkar', (now() - interval '2 days')::date, 41200, 980, 1450, 38, 31200),
   ('cm_1b', 'camp_1', 'cli_afkar', (now() - interval '1 day')::date, 44800, 1120, 1520, 44, 38600),
   ('cm_2a', 'camp_2', 'cli_afkar', (now() - interval '1 day')::date, 22400, 640, 1180, 21, 52400)
+on conflict (id) do nothing;
+
+-- Salla customers seed
+insert into public.customers (id, client_id, salla_id, first_name, last_name, mobile, mobile_code, email, gender, city, country, total_orders, total_spent, loyalty_points, first_order_date, last_order_date, synced_at) values
+  ('cust_1', 'cli_afkar', 1001, 'Mohammed', 'Al-Otaibi', '501234567', '966', 'motaibi@gmail.com', 'male', 'Riyadh', 'Saudi Arabia', 12, 8400, 420, (now() - interval '8 months')::date, (now() - interval '3 days')::date, now()),
+  ('cust_2', 'cli_afkar', 1002, 'Nouf', 'Al-Sudairi', '502345678', '966', 'nouf.s@hotmail.com', 'female', 'Jeddah', 'Saudi Arabia', 5, 3200, 180, (now() - interval '4 months')::date, (now() - interval '1 week')::date, now()),
+  ('cust_3', 'cli_afkar', 1003, 'Abdullah', 'Al-Qahtani', '503456789', '966', 'aq8@yahoo.com', 'male', 'Dammam', 'Saudi Arabia', 2, 1150, 60, (now() - interval '2 months')::date, (now() - interval '2 weeks')::date, now()),
+  ('cust_4', 'cli_afkar', 1004, 'Reem', 'Al-Shammari', '504567890', '966', 'reem.s@outlook.com', 'female', 'Riyadh', 'Saudi Arabia', 1, 650, 30, (now() - interval '3 weeks')::date, (now() - interval '3 weeks')::date, now()),
+  ('cust_5', 'cli_afkar', 1005, 'Khalid', 'Al-Ghamdi', '505678901', '966', 'khamdi@gmail.com', 'male', 'Makkah', 'Saudi Arabia', 8, 5600, 280, (now() - interval '6 months')::date, (now() - interval '5 days')::date, now())
+on conflict (id) do nothing;
+
+-- Salla orders seed
+insert into public.orders (id, client_id, salla_id, customer_id, status, payment_method, selling_channel, total_amount, shipping_cost, tax_amount, currency, items_count, items, date_created, date_completed, synced_at) values
+  ('ord_1', 'cli_afkar', 2001, 'cust_1', 'completed', 'mada', 'online', 750, 25, 112.50, 'SAR', 2, '[{"name":"Abstract Gold Canvas","qty":1,"price":449},{"name":"Neon Calligraphy Frame","qty":1,"price":299}]', now() - interval '3 days', now() - interval '2 days', now()),
+  ('ord_2', 'cli_afkar', 2002, 'cust_2', 'completed', 'visa', 'online', 1299, 0, 194.85, 'SAR', 1, '[{"name":"3D Wooden World Map XL","qty":1,"price":1299}]', now() - interval '1 week', now() - interval '5 days', now()),
+  ('ord_3', 'cli_afkar', 2003, 'cust_5', 'shipped', 'apple_pay', 'online', 899, 30, 134.85, 'SAR', 1, '[{"name":"Majlis Floor Cushion Set","qty":1,"price":899}]', now() - interval '5 days', null, now())
+on conflict (id) do nothing;
+
+-- Salla store products seed
+insert into public.store_products (id, client_id, salla_id, name, sku, price, sale_price, status, category, quantity, sales_count, rating_avg, reviews_count, synced_at) values
+  ('sp_1', 'cli_afkar', 3001, 'Abstract Gold Canvas 3-Piece Set', 'AC-001', 449, 399, 'active', 'Living Room', 15, 34, 4.8, 12, now()),
+  ('sp_2', 'cli_afkar', 3002, 'Neon Islamic Calligraphy Frame', 'NC-002', 299, null, 'active', 'Bedroom', 22, 18, 4.5, 8, now()),
+  ('sp_3', 'cli_afkar', 3003, '3D Wooden World Map XL', 'WM-003', 1299, 1149, 'active', 'Living Room', 5, 34, 4.9, 21, now()),
+  ('sp_4', 'cli_afkar', 3004, 'Majlis Floor Cushion Set', 'MC-004', 899, null, 'active', 'Majlis', 8, 12, 4.2, 6, now()),
+  ('sp_5', 'cli_afkar', 3005, 'Minimalist Line-Art Diptych', 'LA-005', 199, 169, 'hidden', 'Office', 30, 3, 3.8, 2, now())
+on conflict (id) do nothing;
+
+-- Salla reviews seed
+insert into public.reviews (id, client_id, salla_id, type, rating, content, customer_name, product_name, is_published, created_at) values
+  ('rev_1', 'cli_afkar', 4001, 'product', 5, 'Amazing quality, the gold canvas set looks stunning in our living room!', 'Mohammed A.', 'Abstract Gold Canvas 3-Piece Set', true, now() - interval '1 week'),
+  ('rev_2', 'cli_afkar', 4002, 'product', 4, 'Good quality but delivery took longer than expected.', 'Nouf S.', 'Neon Islamic Calligraphy Frame', true, now() - interval '2 weeks'),
+  ('rev_3', 'cli_afkar', 4003, 'product', 5, 'The 3D map is a masterpiece. Worth every riyal.', 'Khalid G.', '3D Wooden World Map XL', true, now() - interval '3 days'),
+  ('rev_4', 'cli_afkar', 4004, 'store', 4, 'Great store, beautiful products, will order again.', 'Reem S.', null, true, now() - interval '1 week')
 on conflict (id) do nothing;
 
 -- Snapshot integrity: one value per KPI per day. Dedupe keeping the newest

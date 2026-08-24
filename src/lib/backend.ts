@@ -20,6 +20,10 @@ import type {
   WeeklyObjective,
   KeyResult,
   ClientReportNote,
+  SallaCustomer,
+  SallaOrder,
+  SallaProduct,
+  SallaReview,
 } from '../types/database'
 
 export const backendAvailable = hasSupabaseEnv && supabase != null
@@ -66,7 +70,7 @@ export const backend = {
   available: backendAvailable,
 
   async loadAll() {
-    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages, reportNotes, products, campaigns, campaignMetrics, taskComments] =
+    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages, reportNotes, products, campaigns, campaignMetrics, taskComments, sallaCustomers, sallaOrders, sallaProducts, sallaReviews] =
       await Promise.all([
         selectAllSafe<Organization>('organizations'),
         selectAllSafe<Client>('clients'),
@@ -88,6 +92,10 @@ export const backend = {
         selectAllSafe<Campaign>('campaigns'),
         selectAllSafe<CampaignMetric>('campaign_metrics', 'date'),
         selectAllSafe<TaskComment>('task_comments', 'created_at'),
+        selectAllSafe<SallaCustomer>('customers', 'total_spent'),
+        selectAllSafe<SallaOrder>('orders', 'date_created'),
+        selectAllSafe<SallaProduct>('store_products'),
+        selectAllSafe<SallaReview>('reviews', 'created_at'),
       ])
     return {
       organization: organization[0] ?? null,
@@ -110,6 +118,10 @@ export const backend = {
       campaigns,
       campaignMetrics,
       taskComments,
+      sallaCustomers,
+      sallaOrders,
+      sallaProducts,
+      sallaReviews,
     }
   },
 
@@ -176,4 +188,9 @@ export const backend = {
 
   patchMessage: (id: string, patch: Record<string, unknown>) => updateById('messages', id, patch),
   deleteMessage: (id: string) => remove('messages', id),
+
+  upsertCustomer: (row: Record<string, unknown>) => upsert('customers', row),
+  upsertOrder: (row: Record<string, unknown>) => upsert('orders', row),
+  upsertStoreProduct: (row: Record<string, unknown>) => upsert('store_products', row),
+  upsertReview: (row: Record<string, unknown>) => upsert('reviews', row),
 }

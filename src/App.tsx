@@ -17,6 +17,10 @@ import { Team } from './features/team/Team'
 import { Chat } from './features/chat/Chat'
 import { Products } from './features/products/Products'
 import { Campaigns } from './features/campaigns/Campaigns'
+import { Customers } from './features/customers/Customers'
+import { Orders } from './features/orders/Orders'
+import { StoreProducts } from './features/store-products/StoreProducts'
+import { Reviews } from './features/reviews/Reviews'
 import { Kpis } from './features/kpis/Kpis'
 import { Data } from './features/data/Data'
 import { Settings } from './features/settings/Settings'
@@ -31,6 +35,10 @@ const pageTitles: Record<string, string> = {
   '/team': 'Team',
   '/chat': 'Team Chat',
   '/products': 'Product Research',
+  '/store-products': 'Products',
+  '/customers': 'Customers',
+  '/orders': 'Orders',
+  '/reviews': 'Reviews',
   '/campaigns': 'Campaigns',
   '/kpis': 'KPIs',
   '/data': 'Data & Sources',
@@ -104,6 +112,14 @@ function App() {
         return <Chat />
       case '/products':
         return <Products />
+      case '/store-products':
+        return <StoreProducts />
+      case '/customers':
+        return <Customers />
+      case '/orders':
+        return <Orders />
+      case '/reviews':
+        return <Reviews />
       case '/campaigns':
         return <Campaigns />
       case '/kpis':

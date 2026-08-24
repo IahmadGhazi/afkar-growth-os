@@ -10,6 +10,10 @@ import {
   MessageSquare,
   Package,
   Megaphone,
+  Users2,
+  ShoppingBag,
+  Store,
+  Star,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useApp } from '@/lib/store'
@@ -33,7 +37,11 @@ const allNavigation: {
   { name: 'Tasks', path: '/tasks', icon: CheckSquare, section: null },
   { name: 'Team', path: '/team', icon: Users, section: null },
   { name: 'Team Chat', path: '/chat', icon: MessageSquare, section: null },
-  { name: 'Products', path: '/products', icon: Package, section: null },
+  { name: 'Product Research', path: '/products', icon: Package, section: null },
+  { name: 'Products', path: '/store-products', icon: Store, section: null },
+  { name: 'Customers', path: '/customers', icon: Users2, section: null },
+  { name: 'Orders', path: '/orders', icon: ShoppingBag, section: null },
+  { name: 'Reviews', path: '/reviews', icon: Star, section: null },
   { name: 'Campaigns', path: '/campaigns', icon: Megaphone, section: 'campaigns' },
   { name: 'KPIs', path: '/kpis', icon: BarChart3, section: null },
   { name: 'Data & Sources', path: '/data', icon: Database, section: null },

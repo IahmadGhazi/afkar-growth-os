@@ -14,6 +14,10 @@ import type {
   Organization,
   ProductCandidate,
   Profile,
+  SallaCustomer,
+  SallaOrder,
+  SallaProduct,
+  SallaReview,
   SyncRun,
   Task,
   TaskComment,
@@ -43,6 +47,10 @@ export interface AppState {
   campaignMetrics: CampaignMetric[]
   taskComments: TaskComment[]
   reportNotes: ClientReportNote[]
+  sallaCustomers: SallaCustomer[]
+  sallaOrders: SallaOrder[]
+  sallaProducts: SallaProduct[]
+  sallaReviews: SallaReview[]
   currentUserId: string | null
   currentClientId: string | null
   /** False until the first backend bootstrap resolves; the shell shows a

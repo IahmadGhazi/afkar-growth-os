@@ -1,0 +1,29 @@
+{
+  "routes": [
+    {
+      "routePath": "/api/admin/users",
+      "mountPath": "/api/admin",
+      "method": "",
+      "module": [
+        "api/admin/users.ts:onRequest"
+      ]
+    },
+    {
+      "routePath": "/api/integrations/status",
+      "mountPath": "/api/integrations",
+      "method": "",
+      "module": [
+        "api/integrations/status.ts:onRequest"
+      ]
+    },
+    {
+      "routePath": "/api/integrations/sync",
+      "mountPath": "/api/integrations",
+      "method": "",
+      "module": [
+        "api/integrations/sync.ts:onRequest"
+      ]
+    }
+  ],
+  "baseURL": "/"
+}
