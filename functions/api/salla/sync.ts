@@ -53,6 +53,31 @@ export async function onRequest(context: { request: Request; env: Record<string,
     return null
   }
 
+  // Helper: convert a Salla date object ({date, timezone}) into a true ISO
+  // instant with offset, so timestamptz stores the correct moment.
+  function sallaIso(d: unknown): string | null {
+    const obj = (d && typeof d === "object") ? (d as { date?: unknown; timezone?: unknown }) : null
+    const raw = obj && typeof obj.date === "string" ? obj.date : typeof d === "string" ? d : null
+    if (!raw) return null
+    const m = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/)
+    if (!m) return null
+    const naive = `${m[1]}T${m[2]}`
+    const tz = obj && typeof obj.timezone === "string" ? obj.timezone : null
+    if (!tz) return `${naive}Z`
+    try {
+      const guess = new Date(`${naive}Z`)
+      const dtf = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      const p: Record<string, string> = {}
+      for (const part of dtf.formatToParts(guess)) if (part.type !== "literal") p[part.type] = part.value
+      const asUTC = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute), Number(p.second))
+      const offMin = Math.round((asUTC - guess.getTime()) / 60000)
+      const sign = offMin < 0 ? "-" : "+"
+      const abs = Math.abs(offMin)
+      const pad = (n: number) => String(n).padStart(2, "0")
+      return `${naive}${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
+    } catch { return `${naive}Z` }
+  }
+
   // Helper: paginated GET from Salla API
   async function sallaGet(path: string, params: Record<string, string> = {}) {
     const url = new URL(`${BASE}${path}`)
@@ -132,8 +157,8 @@ export async function onRequest(context: { request: Request; env: Record<string,
           items: Array.isArray(o.items)
             ? o.items.map((it: any) => ({ name: it.name, quantity: it.quantity, amount: it.amounts?.price?.amount ?? null }))
             : [],
-          date_created: o.date?.date ?? null,
-          date_completed: o.completed_at?.date ?? null,
+          date_created: sallaIso(o.date),
+          date_completed: sallaIso(o.completed_at),
           synced_at: now,
         })
         total++
