@@ -13,6 +13,7 @@ interface PlatformStatus {
   configured: boolean
   account: string | null
   missing: string[]
+  scopes?: string | null
 }
 
 export function IntegrationsPanel() {
@@ -225,6 +226,19 @@ function PlatformCard({
           {DIFFICULTY_LABEL[setup.difficulty]}
         </span>
       </div>
+
+      {/* Scope lock warning — coupons need marketing.read_write on the TOKEN */}
+      {pid === 'salla' && live && server?.scopes != null && !server.scopes.includes('marketing.read_write') && (
+        <div className="text-[11px] px-3 py-2 rounded-lg flex items-start gap-2"
+          style={{ background: 'rgba(245,158,11,.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,.3)' }}>
+          <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+          <span>
+            Coupons locked: this connection predates the marketing scope.
+            Enable <b>Marketing Read &amp; Write</b> (+ Shipping Read) for the app in Partners Portal → Update scopes,
+            then press <b>Reconnect</b> here.
+          </span>
+        </div>
+      )}
 
       {/* Status message */}
       {message && (

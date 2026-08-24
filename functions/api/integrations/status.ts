@@ -60,12 +60,14 @@ export async function onRequest(context: { request: Request; env: Record<string,
   // Salla: check integration_tokens TABLE (OAuth tokens stored by webhook)
   let sallaConfigured = false
   let sallaAccount: string | null = null
+  let sallaScope: string | null = null
   try {
-    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?platform=eq.salla&select=store_name,store_id`, { headers: H })
-    const tokens = (await res.json()) as Array<{ store_name?: string; store_id?: string }>
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?platform=eq.salla&select=store_name,store_id,scope`, { headers: H })
+    const tokens = (await res.json()) as Array<{ store_name?: string; store_id?: string; scope?: string | null }>
     if (tokens.length > 0) {
       sallaConfigured = true
       sallaAccount = tokens[0].store_name ?? tokens[0].store_id ?? null
+      sallaScope = tokens[0].scope ?? null
     }
   } catch { sallaConfigured = false }
 
@@ -73,6 +75,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
     configured: sallaConfigured,
     account: sallaAccount,
     missing: sallaConfigured ? [] : ["Install the app on your Salla store"],
+    scopes: sallaScope,
   }
 
   // Other platforms: check env vars

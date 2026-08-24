@@ -19,6 +19,22 @@ export async function onRequest(context: { request: Request; env: Record<string,
     const oauthError = url.searchParams.get("error")
 
     if (oauthError || !code) {
+      // invalid_scope in FULL mode → auto-fallback to basic scopes so the
+      // connection still succeeds; surface what was lost and how to fix.
+      if (oauthError === "invalid_scope") {
+        try {
+          const dot = state?.lastIndexOf(".")
+          if (state && dot && env.SALLA_WEBHOOK_SECRET) {
+            const payload = Buffer.from(state.slice(0, dot), "base64url").toString("utf8")
+            const expectedSig = await hmacSign(payload, env.SALLA_WEBHOOK_SECRET)
+            const parsed = JSON.parse(payload) as { m?: string }
+            if (expectedSig === state.slice(dot + 1) && parsed.m === "full") {
+              return Response.redirect(`${origin}/api/salla/connect?mode=basic`, 302)
+            }
+          }
+        } catch { /* fall through to generic error */ }
+        return Response.redirect(`${origin}/data?salla=error&reason=${encodeURIComponent("invalid_scope — enable 'Marketing Read & Write' + 'Shipping Read' for the app in Partners Portal, then Reconnect")}`, 302)
+      }
       return Response.redirect(`${origin}/data?salla=error&reason=${encodeURIComponent(oauthError ?? "no_code_in_callback")}`, 302)
     }
 
