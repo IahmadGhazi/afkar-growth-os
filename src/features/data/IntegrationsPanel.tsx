@@ -14,6 +14,7 @@ interface PlatformStatus {
   account: string | null
   missing: string[]
   scopes?: string | null
+  expires_at?: string | null
 }
 
 export function IntegrationsPanel() {
@@ -226,6 +227,23 @@ function PlatformCard({
           {DIFFICULTY_LABEL[setup.difficulty]}
         </span>
       </div>
+
+      {/* Token expiry warning — Salla tokens live 14 days */}
+      {pid === 'salla' && live && server?.expires_at && (() => {
+        const msLeft = new Date(server.expires_at).getTime() - Date.now()
+        const days = Math.ceil(msLeft / 86_400_000)
+        if (days > 5) return null
+        return (
+          <div className="text-[11px] px-3 py-2 rounded-lg flex items-start gap-2"
+            style={{ background: days <= 2 ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.1)', color: days <= 2 ? '#ef4444' : '#f59e0b', border: `1px solid ${days <= 2 ? 'rgba(239,68,68,.3)' : 'rgba(245,158,11,.3)'}` }}>
+            <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+            <span>
+              Store token expires in <b>{days <= 0 ? 'HOURS' : `${days} day${days === 1 ? '' : 's'}`}</b> — when it does, sync/coupons/push stop.
+              Press <b>Reconnect</b> now to refresh the 14-day clock (30 seconds).
+            </span>
+          </div>
+        )
+      })()}
 
       {/* Scope lock warning — coupons need marketing.read_write on the TOKEN */}
       {pid === 'salla' && live && server?.scopes != null && !server.scopes.includes('marketing.read_write') && (

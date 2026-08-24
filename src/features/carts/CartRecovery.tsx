@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Search, ShoppingCart, Copy, Check, ExternalLink, MessageCircle, Phone, Flame, Clock, Snowflake, Trophy, RefreshCw, TicketPercent } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Search, ShoppingCart, Copy, Check, ExternalLink, MessageCircle, Phone, Flame, Clock, Snowflake, Trophy, RefreshCw, TicketPercent, Brain } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { scopeSalla } from '../../lib/selectors'
 import { EmptyState } from '../../components/shared/ui'
@@ -7,6 +7,8 @@ import { LiveBadge } from '../../components/shared/LiveBadge'
 import { toast } from '../../lib/toast'
 import { supabase } from '../../lib/supabase'
 import { refreshFromServer } from '../../lib/store'
+import { computeCustomerIntel } from '../../lib/rfm'
+import { recommendCoupon } from '../../lib/couponsBrain'
 import type { AbandonedCart } from '../../types/database'
 
 type Temp = 'hot' | 'warm' | 'cold'
@@ -120,10 +122,46 @@ export function CartRecovery() {
   // Optimistic coupon codes minted this session (server truth arrives via refresh)
   const [minting, setMinting] = useState<Set<string>>(new Set())
   const [freshCodes, setFreshCodes] = useState<Map<string, string>>(new Map())
-  // Coupon strength — YOU choose the discount, nothing is auto-decided
+  // Coupon strength — YOU decide; the Brain advises per-row
   const [percent, setPercent] = useState(10)
   const [validHours, setValidHours] = useState(48)
+  const [rowOverrides, setRowOverrides] = useState<Map<string, { percent: number; hours: number }>>(new Map())
+  const [activeCoupons, setActiveCoupons] = useState<Array<{ id: number; code: string; amount: number | null }>>([])
   const codeFor = (c: AbandonedCart): string | null => c.coupon_code ?? freshCodes.get(c.id) ?? null
+
+  const intel = useMemo(() => computeCustomerIntel(state.sallaCustomers ?? [], state.sallaOrders ?? []), [state.sallaCustomers, state.sallaOrders])
+  const intelByCustomer = useMemo(() => {
+    const m = new Map<string, { segment: string; lifetimeValue: number; orderCount: number }>()
+    for (const i of intel) m.set(i.customer.id, { segment: i.segment, lifetimeValue: i.lifetimeValue, orderCount: i.orderCount })
+    return m
+  }, [intel])
+
+  // Load ACTIVE coupons once for the attach-existing picker
+  useEffect(() => {
+    void (async () => {
+      try {
+        if (!supabase) return
+        const { data } = await supabase.auth.getSession()
+        if (!data.session?.access_token) return
+        const res = await fetch('/api/salla/coupons', { headers: { Authorization: `Bearer ${data.session.access_token}` } })
+        const body = await res.json()
+        if (res.ok && body.ok) {
+          setActiveCoupons((body.coupons as Array<{ id: number; code: string; amount: number | null; status: string; expiryDate: string | null }>)
+            .filter((c) => c.status === 'active' && (!c.expiryDate || new Date(c.expiryDate.replace(' ', 'T')).getTime() > Date.now()))
+            .map((c) => ({ id: c.id, code: c.code, amount: c.amount })))
+        }
+      } catch { /* picker is optional */ }
+    })()
+  }, [])
+
+  const attachExisting = async (cart: AbandonedCart, code: string) => {
+    if (!supabase) return
+    const res = await supabase.from('abandoned_carts').update({ coupon_code: code }).eq('id', cart.id)
+    if (res.error) { toast.error(`Attach failed: ${res.error.message}`); return }
+    setFreshCodes((prev) => new Map(prev).set(cart.id, code))
+    toast.success(`${code} armed on this cart — WhatsApp/Copy now carry it`)
+    void refreshFromServer()
+  }
 
   const onMint = async (cart: AbandonedCart) => {
     if (!supabase) { toast.error('Backend not configured'); return }
@@ -132,13 +170,13 @@ export function CartRecovery() {
       const { data } = await supabase.auth.getSession()
       const token = data.session?.access_token
       if (!token) { toast.error('Sign in required'); return }
-      const result = await mintCoupon(cart, token, percent, validHours)
+      const result = await mintCoupon(cart, token, rowOverrides.get(cart.id)?.percent ?? percent, rowOverrides.get(cart.id)?.hours ?? validHours)
       if (result.ok && result.code) {
         setFreshCodes((prev) => new Map(prev).set(cart.id, result.code!))
         if (result.cartUpdated === false) {
           toast.error(`Coupon ${result.code} created but couldn't attach to this cart — see Coupons tab in Products`)
         } else {
-          toast.success(`Coupon ${result.code} is live — ${percent}% for ${validHours}h`)
+          toast.success(`Coupon ${result.code} is live — ${rowOverrides.get(cart.id)?.percent ?? percent}% for ${rowOverrides.get(cart.id)?.hours ?? validHours}h`)
         }
         void refreshFromServer()
       } else {
@@ -257,6 +295,11 @@ export function CartRecovery() {
             const meta = TEMP_META[temp]
             const Icon = meta.icon
             const contacted = Boolean(cart.last_contacted_at)
+            const override = rowOverrides.get(cart.id)
+            const brain = recommendCoupon(cart, cart.customer_id ? intelByCustomer.get(cart.customer_id) ?? null : null)
+            const effPercent = override?.percent ?? percent
+            const effHours = override?.hours ?? validHours
+            const brainMatches = brain.percent === effPercent && brain.hours === effHours
             return (
               <div key={cart.id} className="glass-card relative overflow-hidden hover-lift px-4 sm:px-5 py-3.5"
                 style={temp === 'hot' ? { borderColor: 'rgba(239,68,68,.35)' } : undefined}>
@@ -295,6 +338,27 @@ export function CartRecovery() {
                         {cart.customer_email && <span className="truncate">{cart.customer_email}</span>}
                       </div>
                     )}
+                    {/* 🤖 THE KNOWLEDGE BOT — prescribed dose for THIS cart */}
+                    {!codeFor(cart) && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-md"
+                          style={{ background: 'rgba(139,92,246,.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,.3)' }}
+                          title={brain.reasons.join(' · ')}>
+                          <Brain size={10} /> Brain says {brain.percent}% · {brain.hours >= 24 ? `${Math.round(brain.hours / 24)}d` : `${brain.hours}h`}
+                          <span className="opacity-60">({brain.confidence})</span>
+                        </span>
+                        {!brainMatches && (
+                          <button onClick={() => setRowOverrides((prev) => new Map(prev).set(cart.id, { percent: brain.percent, hours: brain.hours }))}
+                            className="text-[10px] font-semibold hover:underline" style={{ color: '#8b5cf6' }}>
+                            Apply
+                          </button>
+                        )}
+                        {override && (
+                          <button onClick={() => setRowOverrides((prev) => { const n = new Map(prev); n.delete(cart.id); return n })}
+                            className="text-[10px] text-[var(--text-muted)] hover:underline">reset to {percent}%</button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 ml-auto shrink-0">
@@ -303,10 +367,20 @@ export function CartRecovery() {
                     </span>
                     {!codeFor(cart) && (
                       <button onClick={() => onMint(cart)} disabled={minting.has(cart.id)}
-                        title="Mint a 15% / 48h coupon in your Salla store and attach it"
+                        title={`Mint a ${effPercent}% / ${effHours >= 24 ? `${Math.round(effHours / 24)}d` : `${effHours}h`} coupon in your Salla store and attach it`}
                         className="btn !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5" style={{ background: 'rgba(240,196,46,.12)', color: '#d29a0c', border: '1px solid rgba(210,154,12,.3)' }}>
-                        <TicketPercent size={13} /> {minting.has(cart.id) ? 'Minting…' : 'Coupon'}
+                        <TicketPercent size={13} /> {minting.has(cart.id) ? 'Minting…' : `${effPercent}%`}
                       </button>
+                    )}
+                    {!codeFor(cart) && activeCoupons.length > 0 && (
+                      <select value="" onChange={(e) => { if (e.target.value) void attachExisting(cart, e.target.value) }}
+                        title="Attach an existing coupon instead of minting a new one"
+                        className="field !w-auto !py-1.5 !px-2 text-xs" style={{ color: '#25D36666', borderColor: 'rgba(37,211,102,.3)' }}>
+                        <option value="">📎 Attach…</option>
+                        {activeCoupons.map((ac) => (
+                          <option key={ac.id} value={ac.code}>{ac.code}{ac.amount != null ? ` (${ac.amount}%)` : ''}</option>
+                        ))}
+                      </select>
                     )}
                     {cart.checkout_url && (
                       <a href={cart.checkout_url} target="_blank" rel="noopener noreferrer"

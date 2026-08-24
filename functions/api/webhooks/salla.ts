@@ -396,6 +396,27 @@ export async function onRequest(context: { request: Request; env: Record<string,
         }
         break
       }
+      // ── Coupon applied at checkout → attribute the rescue!
+      case "coupon.applied": {
+        const code = (data as any)?.coupon?.code ?? (data as any)?.code ?? null
+        const custId = (data as any)?.customer?.id ?? null
+        if (code) {
+          // Find the cart this coupon was attached to → mark it CONVERTED
+          const find = await fetch(`${env.SUPABASE_URL}/rest/v1/abandoned_carts?coupon_code=eq.${encodeURIComponent(code)}&status=neq.purchased&select=id&limit=1`, { headers: GET })
+          const rows = find.ok ? (await find.json()) as Array<{ id: string }> : []
+          if (rows[0]) {
+            await fetch(`${env.SUPABASE_URL}/rest/v1/abandoned_carts?id=eq.${rows[0].id}`, {
+              method: "PATCH", headers: H, body: JSON.stringify({ status: "purchased", updated_at: now }),
+            })
+            await announce(env, { table: "abandoned_carts", row_id: rows[0].id })
+          }
+          await fetch(`${env.SUPABASE_URL}/rest/v1/activity_logs`, {
+            method: "POST", headers: H,
+            body: JSON.stringify({ id: eventId, entity_type: "coupon", entity_id: String(code), action: `applied at checkout${custId ? ` by customer ${custId}` : ""}${rows[0] ? " — RESCUED CART" : ""}`, client_id: clientId, details: {} }),
+          }).catch(() => {})
+        }
+        break
+      }
       case "abandoned.cart.purchased":
       case "abandoned_cart.purchased":
       case "cart.converted":

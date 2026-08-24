@@ -61,13 +61,15 @@ export async function onRequest(context: { request: Request; env: Record<string,
   let sallaConfigured = false
   let sallaAccount: string | null = null
   let sallaScope: string | null = null
+  let sallaExpiresAt: string | null = null
   try {
-    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?platform=eq.salla&select=store_name,store_id,scope`, { headers: H })
-    const tokens = (await res.json()) as Array<{ store_name?: string; store_id?: string; scope?: string | null }>
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?platform=eq.salla&select=store_name,store_id,scope,expires_at`, { headers: H })
+    const tokens = (await res.json()) as Array<{ store_name?: string; store_id?: string; scope?: string | null; expires_at?: string | null }>
     if (tokens.length > 0) {
       sallaConfigured = true
       sallaAccount = tokens[0].store_name ?? tokens[0].store_id ?? null
       sallaScope = tokens[0].scope ?? null
+      sallaExpiresAt = tokens[0].expires_at ?? null
     }
   } catch { sallaConfigured = false }
 
@@ -76,6 +78,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
     account: sallaAccount,
     missing: sallaConfigured ? [] : ["Install the app on your Salla store"],
     scopes: sallaScope,
+    expires_at: sallaExpiresAt,
   }
 
   // Other platforms: check env vars
