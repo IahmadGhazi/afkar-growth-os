@@ -283,6 +283,14 @@ export async function onRequest(context: { request: Request; env: Record<string,
 
   // ---- ABANDONED CARTS ----
   try {
+    // customer FK must resolve or be null — never block a cart on it
+    const custRes = await fetch(`${env.SUPABASE_URL}/rest/v1/customers?client_id=eq.${clientId}&select=id,salla_id`, {
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
+    })
+    const custList = custRes.ok ? (await custRes.json()) as Array<{ id: string; salla_id: number | null }> : []
+    const cartCustMap = new Map<number, string>()
+    for (const c of custList) { if (c.salla_id) cartCustMap.set(c.salla_id, c.id) }
+
     const rows: Array<Record<string, unknown>> = []
     const baseRows: Array<Record<string, unknown>> = []
     let page = 1
@@ -293,9 +301,10 @@ export async function onRequest(context: { request: Request; env: Record<string,
         const items = Array.isArray(c.items)
           ? c.items.map((it: any) => ({ name: it.name ?? it.product?.name ?? "Item", quantity: num(it.quantity) ?? 1, amount: num(it.amounts?.price?.amount ?? it.price?.amount) }))
           : []
+        const cSallaId = typeof c.customer?.id === "number" ? c.customer.id : null
         const base = {
           id: `cart_salla_${c.id}`, client_id: clientId, salla_cart_id: c.id,
-          customer_id: c.customer?.id ? `cust_salla_${c.customer.id}` : null,
+          customer_id: cSallaId ? (cartCustMap.get(cSallaId) ?? null) : null,
           status: c.status === "purchased" ? "purchased" : "abandoned",
           cart_total: num(c.total?.amount) ?? 0,
           items,

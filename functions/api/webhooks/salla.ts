@@ -363,9 +363,13 @@ export async function onRequest(context: { request: Request; env: Record<string,
         const items = Array.isArray(c.items)
           ? c.items.map((it: any) => ({ name: it.name ?? it.product?.name ?? "Item", quantity: num(it.quantity) ?? 1, amount: num(it.amounts?.price?.amount ?? it.price?.amount) }))
           : []
+        // Resolve customer FK — unknown customers must NOT block the cart
+        const cm2 = await custMap()
+        const sallaCustId2 = typeof c.customer?.id === "number" ? c.customer.id : null
+        const custId2 = sallaCustId2 ? (cm2.get(sallaCustId2) ?? null) : null
         const baseCart = {
           id: `cart_salla_${c.id}`, client_id: clientId, salla_cart_id: c.id,
-          customer_id: c.customer?.id ? `cust_salla_${c.customer.id}` : null,
+          customer_id: custId2,
           status: "abandoned" as string,
           cart_total: num(c.total?.amount) ?? 0,
           items,
