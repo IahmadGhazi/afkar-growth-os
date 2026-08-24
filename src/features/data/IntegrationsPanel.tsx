@@ -63,17 +63,10 @@ export function IntegrationsPanel() {
     setSyncing(null)
   }
 
-  const connectSalla = async () => {
-    const token = (await supabase?.auth.getSession())?.data.session?.access_token
-    if (!token) { setSyncMessages((m) => ({ ...m, salla: 'Sign in required.' })); return }
-    try {
-      const res = await fetch('/api/salla/connect', { headers: { Authorization: `Bearer ${token}` } })
-      if (res.redirected) { window.location.href = res.url; return }
-      const json = await res.json().catch(() => ({}))
-      setSyncMessages((m) => ({ ...m, salla: json.error ?? json.message ?? `Connect failed (${res.status})` }))
-    } catch (e) {
-      setSyncMessages((m) => ({ ...m, salla: String((e as Error).message) }))
-    }
+  /** Browser navigation, NOT fetch — the connect function returns a 302
+      redirect to Salla's authorization page which the browser must follow. */
+  const connectSalla = () => {
+    window.location.href = '/api/salla/connect'
   }
 
   const syncAll = async () => {
