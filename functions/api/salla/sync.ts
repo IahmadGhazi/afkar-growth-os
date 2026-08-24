@@ -46,13 +46,15 @@ export async function onRequest(context: { request: Request; env: Record<string,
   const now = new Date().toISOString()
   const results: Record<string, string> = {}
 
-  // Helper: paginated GET from Salla API
-  async function sallaGet(path: string, params: Record<string, string> = {}) {
-    const url = new URL(`${BASE}${path}`)
-    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
-    const res = await fetch(url.toString(), { headers: sallaH, signal: AbortSignal.timeout(15000) })
-    if (!res.ok) throw new Error(`Salla API ${res.status}: ${(await res.text()).slice(0, 200)}`)
-    return res.json()
+  // Helper: upsert a row into Supabase and CHECK the response
+  async function upsert(table: string, row: Record<string, unknown>) {
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?on_conflict=id`, {
+      method: "POST", headers: H, body: JSON.stringify(row),
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => "")
+      throw new Error(`${table} upsert ${res.status}: ${text.slice(0, 200)}`)
+    }
   }
 
   // ---- SYNC CUSTOMERS ----
@@ -63,16 +65,12 @@ export async function onRequest(context: { request: Request; env: Record<string,
       const body = await sallaGet("/customers", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const c of list) {
-        const id = `cust_salla_${c.id}`
-        await fetch(`${env.SUPABASE_URL}/rest/v1/customers?on_conflict=id`, {
-          method: "POST", headers: H,
-          body: JSON.stringify({
-            id, client_id: clientId, salla_id: c.id,
-            first_name: c.first_name, last_name: c.last_name,
-            mobile: c.mobile, mobile_code: c.mobile_code, email: c.email,
-            gender: c.gender, city: c.city, country: c.country,
-            avatar_url: c.avatar, synced_at: now,
-          }),
+        await upsert("customers", {
+          id: `cust_salla_${c.id}`, client_id: clientId, salla_id: c.id,
+          first_name: c.first_name, last_name: c.last_name,
+          mobile: c.mobile, mobile_code: c.mobile_code, email: c.email,
+          gender: c.gender, city: c.city, country: c.country,
+          avatar_url: c.avatar, synced_at: now,
         })
         total++
       }
@@ -81,7 +79,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
       page++
     }
     results.customers = `${total} synced`
-  } catch (e) { results.customers = `error: ${String((e as Error).message).slice(0, 100)}` }
+  } catch (e) { results.customers = `error: ${String((e as Error).message).slice(0, 200)}` }
 
   // ---- SYNC ORDERS ----
   try {
@@ -91,24 +89,20 @@ export async function onRequest(context: { request: Request; env: Record<string,
       const body = await sallaGet("/orders", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const o of list) {
-        const id = `ord_salla_${o.id}`
-        await fetch(`${env.SUPABASE_URL}/rest/v1/orders?on_conflict=id`, {
-          method: "POST", headers: H,
-          body: JSON.stringify({
-            id, client_id: clientId, salla_id: o.id,
-            status: o.status ?? "payment_completed",
-            payment_method: o.payment_method ?? null,
-            selling_channel: o.selling_channel ?? null,
-            total_amount: o.amounts?.total?.amount ?? o.total ?? 0,
-            shipping_cost: o.amounts?.shipping?.amount ?? 0,
-            tax_amount: o.amounts?.tax?.amount ?? 0,
-            currency: o.currency ?? "SAR",
-            items_count: Array.isArray(o.items) ? o.items.length : 0,
-            items: o.items ?? [],
-            date_created: o.date?.date ?? null,
-            date_completed: o.completed_at?.date ?? null,
-            synced_at: now,
-          }),
+        await upsert("orders", {
+          id: `ord_salla_${o.id}`, client_id: clientId, salla_id: o.id,
+          status: o.status ?? "payment_completed",
+          payment_method: o.payment_method ?? null,
+          selling_channel: o.selling_channel ?? null,
+          total_amount: o.amounts?.total?.amount ?? o.total ?? 0,
+          shipping_cost: o.amounts?.shipping?.amount ?? 0,
+          tax_amount: o.amounts?.tax?.amount ?? 0,
+          currency: o.currency ?? "SAR",
+          items_count: Array.isArray(o.items) ? o.items.length : 0,
+          items: o.items ?? [],
+          date_created: o.date?.date ?? null,
+          date_completed: o.completed_at?.date ?? null,
+          synced_at: now,
         })
         total++
       }
@@ -117,7 +111,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
       page++
     }
     results.orders = `${total} synced`
-  } catch (e) { results.orders = `error: ${String((e as Error).message).slice(0, 100)}` }
+  } catch (e) { results.orders = `error: ${String((e as Error).message).slice(0, 200)}` }
 
   // ---- SYNC PRODUCTS ----
   try {
@@ -127,20 +121,16 @@ export async function onRequest(context: { request: Request; env: Record<string,
       const body = await sallaGet("/products", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const p of list) {
-        const id = `sp_salla_${p.id}`
-        await fetch(`${env.SUPABASE_URL}/rest/v1/store_products?on_conflict=id`, {
-          method: "POST", headers: H,
-          body: JSON.stringify({
-            id, client_id: clientId, salla_id: p.id,
-            name: p.name, sku: p.sku,
-            price: p.price?.amount ?? null,
-            sale_price: p.sale_price?.amount ?? null,
-            status: p.status ?? "active",
-            category: p.categories?.[0]?.name ?? null,
-            image_url: p.thumbnail ?? null,
-            quantity: p.quantity ?? 0,
-            synced_at: now,
-          }),
+        await upsert("store_products", {
+          id: `sp_salla_${p.id}`, client_id: clientId, salla_id: p.id,
+          name: p.name, sku: p.sku,
+          price: p.price?.amount ?? null,
+          sale_price: p.sale_price?.amount ?? null,
+          status: p.status ?? "active",
+          category: p.categories?.[0]?.name ?? null,
+          image_url: p.thumbnail ?? null,
+          quantity: p.quantity ?? 0,
+          synced_at: now,
         })
         total++
       }
@@ -149,7 +139,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
       page++
     }
     results.products = `${total} synced`
-  } catch (e) { results.products = `error: ${String((e as Error).message).slice(0, 100)}` }
+  } catch (e) { results.products = `error: ${String((e as Error).message).slice(0, 200)}` }
 
   // ---- SYNC REVIEWS ----
   try {
@@ -157,24 +147,20 @@ export async function onRequest(context: { request: Request; env: Record<string,
     const list = (body?.data ?? []) as any[]
     let total = 0
     for (const r of list) {
-      const id = `rev_salla_${r.id}`
-      await fetch(`${env.SUPABASE_URL}/rest/v1/reviews?on_conflict=id`, {
-        method: "POST", headers: H,
-        body: JSON.stringify({
-          id, client_id: clientId, salla_id: r.id,
-          type: r.type ?? "product", rating: r.rating ?? null,
-          content: r.content ?? null,
-          customer_name: r.customer?.name ?? null,
-          product_name: r.product?.name ?? null,
-          is_published: r.is_published ?? true,
-          likes_count: r.likes_count ?? 0,
-          created_at: r.created_at ?? now,
-        }),
+      await upsert("reviews", {
+        id: `rev_salla_${r.id}`, client_id: clientId, salla_id: r.id,
+        type: r.type ?? "product", rating: r.rating ?? null,
+        content: r.content ?? null,
+        customer_name: r.customer?.name ?? null,
+        product_name: r.product?.name ?? null,
+        is_published: r.is_published ?? true,
+        likes_count: r.likes_count ?? 0,
+        created_at: r.created_at ?? now,
       })
       total++
     }
     results.reviews = `${total} synced`
-  } catch (e) { results.reviews = `error: ${String((e as Error).message).slice(0, 100)}` }
+  } catch (e) { results.reviews = `error: ${String((e as Error).message).slice(0, 200)}` }
 
   return json({ ok: true, results })
 }
