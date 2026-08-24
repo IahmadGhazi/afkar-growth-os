@@ -24,6 +24,7 @@ export function IntegrationsPanel() {
   const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
+  const [sallaSyncMsg, setSallaSyncMsg] = useState<string | null>(null)
 
   const load = async () => {
     if (!supabase) { setError('Supabase not configured.'); return }
@@ -64,6 +65,31 @@ export function IntegrationsPanel() {
     setSyncing(false)
   }
 
+  const syncSalla = async () => {
+    if (!supabase) return
+    setSyncing(true)
+    setSallaSyncMsg(null)
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    try {
+      const res = await fetch('/api/salla/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+      })
+      const json = await res.json()
+      if (res.ok && json.results) {
+        const r = json.results as Record<string, string>
+        setSallaSyncMsg(`Sync complete: ${Object.entries(r).map(([k, v]) => `${k}: ${v}`).join(' · ')}`)
+        void load()
+      } else {
+        setSallaSyncMsg(json.message ?? json.error ?? `Sync failed (${res.status})`)
+      }
+    } catch (e) {
+      setSallaSyncMsg(String((e as Error).message))
+    }
+    setSyncing(false)
+  }
+
   return (
     <div className="glass-card p-5 space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -71,11 +97,25 @@ export function IntegrationsPanel() {
           <Cloud size={15} className="text-[var(--brand)]" />
           Live puller: yesterday's spend & sales per platform, every 3 hours.
         </div>
-        <button onClick={syncNow} disabled={syncing} className="btn btn-primary !text-xs !px-3 !py-1.5 shrink-0">
-          <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
-          Sync now
-        </button>
+        <div className="flex gap-2 shrink-0">
+          {/* Salla data sync */}
+          <button onClick={syncSalla} disabled={syncing} className="btn btn-outline !text-xs !px-3 !py-1.5">
+            <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
+            Sync Salla Data
+          </button>
+          {/* Ads sync */}
+          <button onClick={syncNow} disabled={syncing} className="btn btn-primary !text-xs !px-3 !py-1.5">
+            <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
+            Sync Ads
+          </button>
+        </div>
       </div>
+
+      {sallaSyncMsg && (
+        <div className={`text-xs px-3 py-2 rounded-lg ${sallaSyncMsg.includes('error') ? 'bg-[var(--critical-soft)] text-[var(--critical)]' : 'bg-[var(--positive-soft)] text-[var(--positive)]'}`}>
+          {sallaSyncMsg}
+        </div>
+      )}
 
       {syncMsg && (
         <div className={`text-xs px-3 py-2 rounded-lg ${syncMsg.includes('complete') ? 'bg-[var(--positive-soft)] text-[var(--positive)]' : 'bg-[var(--warning-soft)] text-[var(--warning)]'}`}>
