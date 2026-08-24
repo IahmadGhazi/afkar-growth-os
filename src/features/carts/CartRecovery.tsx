@@ -14,7 +14,9 @@ import type { AbandonedCart } from '../../types/database'
 type Temp = 'hot' | 'warm' | 'cold'
 
 function tempOf(cart: AbandonedCart): Temp {
-  const mins = cart.age_minutes ?? Math.floor((Date.now() - new Date(cart.updated_at).getTime()) / 60000)
+  // LIVE age from updated_at — age_minutes is a stale snapshot from sync time
+  const mins = Math.floor((Date.now() - new Date(cart.updated_at).getTime()) / 60000)
+  if (!Number.isFinite(mins) || mins < 0) return 'cold'
   if (mins <= 60) return 'hot'
   if (mins <= 60 * 24) return 'warm'
   return 'cold'
