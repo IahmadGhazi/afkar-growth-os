@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Star, MessageSquare, X } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { EmptyState } from '../../components/shared/ui'
+import { LiveBadge } from '../../components/shared/LiveBadge'
 
 export function Reviews() {
   const { state } = useApp()
@@ -35,6 +36,8 @@ export function Reviews() {
           <div className="text-sm text-[var(--text-muted)]">{reviews.length} reviews · avg {avgRating}★</div>
         </div>
       </div>
+
+      <LiveBadge />
 
       {/* Rating distribution */}
       <div className="glass-card p-5">

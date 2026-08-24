@@ -4,6 +4,7 @@ import { useApp } from '../../lib/store'
 import { EmptyState } from '../../components/shared/ui'
 import { computeCustomerIntel, SEGMENTS, type CustomerIntel, type SegmentId } from '../../lib/rfm'
 import { CustomerDrawer } from './CustomerDrawer'
+import { LiveBadge } from '../../components/shared/LiveBadge'
 
 export function Customers() {
   const { state } = useApp()
@@ -50,6 +51,8 @@ export function Customers() {
           </div>
         </div>
       </div>
+
+      <LiveBadge />
 
       {/* Smart segments */}
       <div className="flex flex-wrap gap-2">

@@ -31,6 +31,7 @@ import { DONE_STATUSES } from './selectors'
 import { backend as rawBackend } from './backend'
 import { supabase } from './supabase'
 import { toast } from './toast'
+import { markPush, markRealtimeDown, markRealtimeUp, markSyncFail, markSyncOk } from './live'
 
 type Listener = () => void
 
@@ -160,6 +161,7 @@ export async function refreshFromServer() {
   refreshing = true
   try {
     const data = await rawBackend.loadAll()
+    markSyncOk()
     set((s) => ({
       ...s,
       organization: data.organization ?? s.organization,
@@ -194,6 +196,7 @@ export async function refreshFromServer() {
     sweepOverdue()
   } catch (err) {
     console.error('Refresh failed:', err)
+    markSyncFail(err)
   } finally {
     refreshing = false
   }
@@ -1301,6 +1304,7 @@ function startLiveSync() {
   })
   // Webhook push-signal: Salla events announce themselves → near-instant refresh
   liveChannel.on('broadcast', { event: 'salla-sync' }, () => {
+    markPush()
     if (refreshTimer) clearTimeout(refreshTimer)
     refreshTimer = setTimeout(() => refreshFromServer(), 60)
   })
@@ -1309,12 +1313,20 @@ function startLiveSync() {
       'postgres_changes',
       { event: '*', schema: 'public', table },
       () => {
+        markPush()
         if (refreshTimer) clearTimeout(refreshTimer)
         refreshTimer = setTimeout(() => refreshFromServer(), 120)
       },
     )
   }
-  liveChannel.subscribe()
+  liveChannel.subscribe((status) => {
+    if (status === 'SUBSCRIBED') markRealtimeUp()
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+      markRealtimeDown(`Realtime ${String(status).toLowerCase()} — retrying via polling`)
+      // attempt one rejoin after a beat
+      setTimeout(() => { try { liveChannel?.subscribe() } catch { /* noop */ } }, 5000)
+    }
+  })
 
   // ── Safety-net poll: refresh store data every 25s while the tab is visible.
   // Realtime handles instant push once the publication is enabled; this

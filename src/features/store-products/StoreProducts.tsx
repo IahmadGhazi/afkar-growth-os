@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Search, Package, PackageX, Star, AlertTriangle } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { EmptyState } from '../../components/shared/ui'
+import { LiveBadge } from '../../components/shared/LiveBadge'
 
 export function StoreProducts() {
   const { state } = useApp()
@@ -31,6 +32,8 @@ export function StoreProducts() {
           </div>
         </div>
       </div>
+
+      <LiveBadge />
 
       {/* Best sellers + low stock alerts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
