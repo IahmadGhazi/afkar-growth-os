@@ -1,7 +1,12 @@
 ﻿/**
- * POST /api/salla/sync â€” pulls customers, orders, products, reviews from
- * the Salla API using stored tokens. Writes to the respective tables.
+ * POST /api/salla/sync - pulls customers, orders, products, reviews,
+ * shipments and abandoned carts from the Salla API using stored tokens.
  * Staff gate: admin / account_manager / media_buyer.
+ *
+ * Subrequest budget: Cloudflare allows ~50 subrequests per invocation and
+ * BOTH Salla reads AND Supabase writes count. We budget Salla reads at 42
+ * and batch all DB writes into one request per table, so the whole six-type
+ * sync fits comfortably inside one invocation.
  */
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json", "x-content-type-options": "nosniff" } })
@@ -46,15 +51,12 @@ export async function onRequest(context: { request: Request; env: Record<string,
   const now = new Date().toISOString()
   const results: Record<string, string> = {}
 
-  // Helper: coerce unknown Salla value to number or null
   function num(v: unknown): number | null {
     if (typeof v === "number" && Number.isFinite(v)) return v
     if (typeof v === "string" && v.trim() !== "" && !isNaN(parseFloat(v))) return parseFloat(v)
     return null
   }
 
-  // Helper: convert a Salla date object ({date, timezone}) into a true ISO
-  // instant with offset, so timestamptz stores the correct moment.
   function sallaIso(d: unknown): string | null {
     const obj = (d && typeof d === "object") ? (d as { date?: unknown; timezone?: unknown }) : null
     const raw = obj && typeof obj.date === "string" ? obj.date : typeof d === "string" ? d : null
@@ -78,13 +80,24 @@ export async function onRequest(context: { request: Request; env: Record<string,
     } catch { return `${naive}Z` }
   }
 
-  // Helper: paginated GET from Salla API.
-  // Cloudflare allows ~50 subrequests per invocation; we budget them so
-  // every entity type gets its share instead of starving later sections.
+  // BATCH upsert: one HTTP request per table (rows chunked at 200).
+  async function upsertMany(table: string, rows: Array<Record<string, unknown>>) {
+    if (!rows.length) return
+    for (let i = 0; i < rows.length; i += 200) {
+      const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?on_conflict=id`, {
+        method: "POST", headers: H, body: JSON.stringify(rows.slice(i, i + 200)),
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => "")
+        throw new Error(`${table} upsert ${res.status}: ${text.slice(0, 200)}`)
+      }
+    }
+  }
+
   let sallaCalls = 0
   const SALLA_BUDGET = 42
   async function sallaGet(path: string, params: Record<string, string> = {}) {
-    if (++sallaCalls > SALLA_BUDGET) throw new Error("paused: sync budget reached (resumes next run)")
+    if (++sallaCalls > SALLA_BUDGET) throw new Error("paused: sync budget reached")
     const url = new URL(`${BASE}${path}`)
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
     const res = await fetch(url.toString(), { headers: sallaH, signal: AbortSignal.timeout(15000) })
@@ -92,44 +105,32 @@ export async function onRequest(context: { request: Request; env: Record<string,
     return res.json()
   }
 
-  // Helper: upsert a row into Supabase and CHECK the response
-  async function upsert(table: string, row: Record<string, unknown>) {
-    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?on_conflict=id`, {
-      method: "POST", headers: H, body: JSON.stringify(row),
-    })
-    if (!res.ok) {
-      const text = await res.text().catch(() => "")
-      throw new Error(`${table} upsert ${res.status}: ${text.slice(0, 200)}`)
-    }
-  }
-
-  // ---- SYNC CUSTOMERS ----
+  // ---- CUSTOMERS ----
   try {
+    const rows: Array<Record<string, unknown>> = []
     let page = 1
-    let total = 0
     while (page <= 6) {
       const body = await sallaGet("/customers", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const c of list) {
-        await upsert("customers", {
+        rows.push({
           id: `cust_salla_${c.id}`, client_id: clientId, salla_id: c.id,
           first_name: c.first_name, last_name: c.last_name,
           mobile: c.mobile, mobile_code: c.mobile_code, email: c.email,
           gender: c.gender, city: c.city, country: c.country,
           avatar_url: c.avatar, synced_at: now,
         })
-        total++
       }
       const totalPages = body?.pagination?.totalPages ?? 1
       if (page >= totalPages || list.length === 0) break
       page++
     }
-    results.customers = `${total} synced`
-  } catch (e) { results.customers = `error: ${String((e as Error).message).slice(0, 200)}` }
+    await upsertMany("customers", rows)
+    results.customers = `${rows.length} synced`
+  } catch (e) { results.customers = `error: ${String((e as Error).message).slice(0, 160)}` }
 
-  // ---- SYNC ORDERS ----
+  // ---- ORDERS ----
   try {
-    // Build a map of Salla customer IDs to our customer row IDs for linking
     const custRes = await fetch(`${env.SUPABASE_URL}/rest/v1/customers?client_id=eq.${clientId}&select=id,salla_id`, {
       headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
     })
@@ -137,17 +138,16 @@ export async function onRequest(context: { request: Request; env: Record<string,
     const custMap = new Map<number, string>()
     for (const c of custList) { if (c.salla_id) custMap.set(c.salla_id, c.id) }
 
+    const rows: Array<Record<string, unknown>> = []
     let page = 1
-    let total = 0
     while (page <= 12) {
       const body = await sallaGet("/orders", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const o of list) {
-        const totalAmt = typeof o.total === 'number' ? o.total : num(o.amounts?.total?.amount)
-        // Resolve the linked customer by their Salla ID
+        const totalAmt = typeof o.total === "number" ? o.total : num(o.amounts?.total?.amount)
         const sallaCustId = typeof o.customer?.id === "number" ? o.customer.id
           : typeof o.customer_id === "number" ? o.customer_id : null
-        await upsert("orders", {
+        rows.push({
           id: `ord_salla_${o.id}`, client_id: clientId, salla_id: o.id,
           reference: o.reference_id != null ? String(o.reference_id) : null,
           customer_id: sallaCustId ? (custMap.get(sallaCustId) ?? null) : null,
@@ -166,25 +166,32 @@ export async function onRequest(context: { request: Request; env: Record<string,
           date_completed: sallaIso(o.completed_at),
           synced_at: now,
         })
-        total++
       }
       const totalPages = body?.pagination?.totalPages ?? 1
       if (page >= totalPages || list.length === 0) break
       page++
     }
-    results.orders = `${total} synced`
-  } catch (e) { results.orders = `error: ${String((e as Error).message).slice(0, 200)}` }
+    try {
+      await upsertMany("orders", rows)
+    } catch (e) {
+      // reference column not added yet? land everything except it
+      if (String((e as Error).message).includes("column orders.reference")) {
+        await upsertMany("orders", rows.map(({ reference, ...rest }) => rest))
+      } else throw e
+    }
+    results.orders = `${rows.length} synced`
+  } catch (e) { results.orders = `error: ${String((e as Error).message).slice(0, 160)}` }
 
-  // ---- SYNC PRODUCTS ----
+  // ---- PRODUCTS ----
   try {
+    const statusMap: Record<string, string> = { sale: "active", available: "active", hidden: "hidden", out_of_stock: "out_of_stock" }
+    const rows: Array<Record<string, unknown>> = []
     let page = 1
-    let total = 0
     while (page <= 6) {
       const body = await sallaGet("/products", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const p of list) {
-        const statusMap: Record<string, string> = { sale: "active", available: "active", hidden: "hidden", out_of_stock: "out_of_stock" }
-        await upsert("store_products", {
+        rows.push({
           id: `sp_salla_${p.id}`, client_id: clientId, salla_id: p.id,
           name: p.name, sku: p.sku,
           price: num(p.price?.amount),
@@ -195,51 +202,51 @@ export async function onRequest(context: { request: Request; env: Record<string,
           quantity: num(p.quantity) ?? 0,
           synced_at: now,
         })
-        total++
       }
       const totalPages = body?.pagination?.totalPages ?? 1
       if (page >= totalPages || list.length === 0) break
       page++
     }
-    results.products = `${total} synced`
-  } catch (e) { results.products = `error: ${String((e as Error).message).slice(0, 200)}` }
+    await upsertMany("store_products", rows)
+    results.products = `${rows.length} synced`
+  } catch (e) { results.products = `error: ${String((e as Error).message).slice(0, 160)}` }
 
-  // ---- SYNC REVIEWS ----
+  // ---- REVIEWS ----
   try {
+    const rows: Array<Record<string, unknown>> = []
     let page = 1
-    let total = 0
     while (page <= 4) {
       const body = await sallaGet("/feedbacks", { per_page: "50", type: "product", page: String(page) })
       const list = (body?.data ?? []) as any[]
       for (const r of list) {
-        await upsert("reviews", {
+        rows.push({
           id: `rev_salla_${r.id}`, client_id: clientId, salla_id: r.id,
-          type: r.type ?? "product", rating: r.rating ?? null,
-          content: r.content ?? null,
+          type: r.type ?? "product", rating: num(r.rating),
+          content: typeof r.content === "string" ? r.content : null,
           customer_name: r.customer?.name ?? null,
           product_name: r.product?.name ?? null,
           is_published: r.is_published ?? true,
-          likes_count: r.likes_count ?? 0,
+          likes_count: num(r.likes_count) ?? 0,
           created_at: sallaIso(r.created_at) ?? now,
         })
-        total++
       }
       const totalPages = body?.pagination?.totalPages ?? 1
       if (page >= totalPages || list.length === 0) break
       page++
     }
-    results.reviews = `${total} synced`
-  } catch (e) { results.reviews = `error: ${String((e as Error).message).slice(0, 200)}` }
+    await upsertMany("reviews", rows)
+    results.reviews = `${rows.length} synced`
+  } catch (e) { results.reviews = `error: ${String((e as Error).message).slice(0, 160)}` }
 
-  // ---- SYNC SHIPMENTS (delivery health board data) ----
+  // ---- SHIPMENTS ----
   try {
+    const rows: Array<Record<string, unknown>> = []
     let page = 1
-    let total = 0
     while (page <= 6) {
       const body = await sallaGet("/shipments", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const s of list) {
-        await upsert("shipments", {
+        rows.push({
           id: `shp_salla_${s.id}`, client_id: clientId,
           order_id: s.order_id ? `ord_salla_${s.order_id}` : null,
           salla_shipment_id: s.id,
@@ -250,19 +257,20 @@ export async function onRequest(context: { request: Request; env: Record<string,
           created_at: s.created_at?.date ?? now,
           updated_at: now,
         })
-        total++
       }
       const totalPages = body?.pagination?.totalPages ?? 1
       if (page >= totalPages || list.length === 0) break
       page++
     }
-    results.shipments = `${total} synced`
-  } catch (e) { results.shipments = `error: ${String((e as Error).message).slice(0, 200)}` }
+    await upsertMany("shipments", rows)
+    results.shipments = `${rows.length} synced`
+  } catch (e) { results.shipments = `error: ${String((e as Error).message).slice(0, 160)}` }
 
-  // ---- SYNC ABANDONED CARTS (recovery engine fuel) ----
+  // ---- ABANDONED CARTS ----
   try {
+    const rows: Array<Record<string, unknown>> = []
+    const baseRows: Array<Record<string, unknown>> = []
     let page = 1
-    let total = 0
     while (page <= 5) {
       const body = await sallaGet("/carts/abandoned", { page: String(page), per_page: "60" })
       const list = (body?.data ?? []) as any[]
@@ -270,29 +278,39 @@ export async function onRequest(context: { request: Request; env: Record<string,
         const items = Array.isArray(c.items)
           ? c.items.map((it: any) => ({ name: it.name ?? it.product?.name ?? "Item", quantity: num(it.quantity) ?? 1, amount: num(it.amounts?.price?.amount ?? it.price?.amount) }))
           : []
-        await upsert("abandoned_carts", {
+        const base = {
           id: `cart_salla_${c.id}`, client_id: clientId, salla_cart_id: c.id,
           customer_id: c.customer?.id ? `cust_salla_${c.customer.id}` : null,
           status: c.status === "purchased" ? "purchased" : "abandoned",
           cart_total: num(c.total?.amount) ?? 0,
           items,
+          created_at: c.created_at?.date ?? now,
+          updated_at: c.updated_at?.date ?? now,
+        }
+        baseRows.push(base)
+        rows.push({
+          ...base,
           checkout_url: c.checkout_url ?? null,
           customer_name: c.customer?.name ?? null,
           customer_mobile: c.customer?.mobile ? `${c.customer.mobile_code ?? ""}${c.customer.mobile}` : null,
           customer_email: c.customer?.email ?? null,
           coupon_code: c.coupon?.code ?? null,
           age_minutes: num(c.age_in_minutes),
-          created_at: c.created_at?.date ?? now,
-          updated_at: c.updated_at?.date ?? now,
         })
-        total++
       }
       const totalPages = body?.pagination?.totalPages ?? 1
       if (page >= totalPages || list.length === 0) break
       page++
     }
-    results.abandonedCarts = `${total} synced`
-  } catch (e) { results.abandonedCarts = `error: ${String((e as Error).message).slice(0, 200)}` }
+    try {
+      await upsertMany("abandoned_carts", rows)
+    } catch (e) {
+      if (String((e as Error).message).includes("abandoned_carts.")) {
+        await upsertMany("abandoned_carts", baseRows)
+      } else throw e
+    }
+    results.abandonedCarts = `${rows.length} synced`
+  } catch (e) { results.abandonedCarts = `error: ${String((e as Error).message).slice(0, 160)}` }
 
   return json({ ok: true, results })
 }
