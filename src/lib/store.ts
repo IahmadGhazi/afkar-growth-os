@@ -215,6 +215,7 @@ async function bootstrap() {
     const { data: userData } = await supabase!.auth.getUser()
     const authUser = userData?.user ?? null
     const data = await backend.loadAll()
+    markSyncOk()
     set((s) => {
       const next = {
         ...s,
