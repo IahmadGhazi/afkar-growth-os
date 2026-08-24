@@ -25,12 +25,49 @@ export async function onRequest(context: { request: Request; env: Record<string,
   const clientId = `cli_salla_${body.merchant}`
   const data = body.data ?? {}
   const now = new Date().toISOString()
-
-  // Find the client for this merchant
-  const clientRes = await fetch(`${env.SUPABASE_URL}/rest/v1/clients?id=eq.${clientId}&select=id`, { headers: H })
-  if (!(await clientRes.json()).length) return json({ error: "unknown merchant" }, 404)
-
   const eventId = `${body.event}_${body.merchant}_${Date.now()}`
+
+  // ── APP STORE AUTHORIZE: the FIRST event when a merchant installs the app.
+  // This creates the client row AND stores tokens. Must run before the
+  // client-existence check because the client doesn't exist yet.
+  if (body.event === "app.store.authorize") {
+    const tokens = data as Record<string, string>
+    if (!tokens.access_token) return json({ error: "missing access_token" }, 400)
+
+    // Fetch merchant info
+    const userInfo = await fetch("https://accounts.salla.sa/oauth2/user/info", {
+      headers: { authorization: `Bearer ${tokens.access_token}` },
+    }).then((r) => r.json() as Promise<{ name?: string; merchant?: { name?: string } }>).catch(() => ({}))
+
+    const storeName = userInfo.merchant?.name ?? userInfo.name ?? `Salla Store ${body.merchant}`
+
+    // Create client row
+    await fetch(`${env.SUPABASE_URL}/rest/v1/clients?on_conflict=id`, {
+      method: "POST", headers: H,
+      body: JSON.stringify({
+        id: clientId, organization_id: "org_afkar",
+        name: storeName, slug: `salla-${body.merchant}`, status: "active", settings: {},
+      }),
+    })
+
+    // Store tokens
+    const expiresAt = new Date(Date.now() + (Number(tokens.expires) || 1209599) * 1000).toISOString()
+    await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?on_conflict=client_id,platform`, {
+      method: "POST", headers: H,
+      body: JSON.stringify({
+        client_id: clientId, platform: "salla",
+        access_token: tokens.access_token, refresh_token: tokens.refresh_token,
+        expires_at: expiresAt, store_id: String(body.merchant), store_name: storeName,
+        merchant_id: body.merchant, scope: tokens.scope ?? null,
+      }),
+    })
+
+    return json({ ok: true, event: body.event, message: `Connected store: ${storeName}` })
+  }
+
+  // For ALL other events, the client must already exist (created by app.store.authorize)
+  const clientRes = await fetch(`${env.SUPABASE_URL}/rest/v1/clients?id=eq.${clientId}&select=id`, { headers: H })
+  if (!(await clientRes.json()).length) return json({ error: "unknown merchant — install the app first" }, 404)
 
   switch (body.event) {
     case "order.created":
