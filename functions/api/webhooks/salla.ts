@@ -72,20 +72,27 @@ export async function onRequest(context: { request: Request; env: Record<string,
   const eventId = `${body.event}_${body.merchant}_${Date.now()}`
   const errors: string[] = []
 
-  // Resolve the client_id for this merchant via integration_tokens —
-  // pattern-independent (raw id, store_-prefixed, or embedded in client id).
+  // Resolve the client_id for this merchant. Salla uses TWO different ids:
+  // webhook `merchant` (e.g. 1765935375) vs OAuth store id (e.g. 1787594629287),
+  // so match every known shape, and if there is exactly ONE connected Salla
+  // store, attribute the event to it — that is unambiguous in practice.
   async function resolveClientId(): Promise<string | null> {
+    const m = String(body.merchant)
     try {
       const res = await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?platform=eq.salla&select=client_id,store_id`, { headers: GET })
       if (res.ok) {
         const rows = (await res.json()) as Array<{ client_id?: string; store_id?: string | null }>
-        const m = String(body.merchant)
-        const hit = rows.find((r) =>
+        const exact = rows.find((r) =>
           r.store_id === m ||
           r.store_id === `store_${m}` ||
+          String(r.store_id ?? "").includes(m) ||
           String(r.client_id ?? "").endsWith(m),
         )
-        if (hit?.client_id) return hit.client_id
+        if (exact?.client_id) return exact.client_id
+        if (rows.length === 1 && rows[0]?.client_id) {
+          console.warn(`[salla-webhook] merchant ${m} did not match stored identity; attributing to sole connected store`)
+          return rows[0].client_id
+        }
       }
     } catch { /* fallthrough */ }
     return null
