@@ -4,6 +4,14 @@
  * appropriate table. No auth gate (Salla calls this server-to-server).
  * Every DB write is checked; failures are logged loudly, never swallowed.
  */
+import { createClient } from "@supabase/supabase-js"
+
+/**
+ * POST /api/webhooks/salla — receives ALL Salla webhook events.
+ * Validates the payload, matches to the correct client, writes to the
+ * appropriate table. No auth gate (Salla calls this server-to-server).
+ * Every DB write is checked; failures are logged loudly, never swallowed.
+ */
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json", "x-content-type-options": "nosniff" } })
 
@@ -16,46 +24,34 @@ const statusOf = (v: unknown): string =>
   typeof v === "string" ? v : ((v as any)?.slug ?? (v as any)?.name ?? "unknown")
 const PROD_STATUS: Record<string, string> = { sale: "active", available: "active", hidden: "hidden", out_of_stock: "out_of_stock" }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
 /**
- * Push-announce a change to every open browser via a Supabase Realtime
- * broadcast (Phoenix protocol over raw WebSocket). This works WITHOUT the
- * table publications — the webhook itself becomes the push signal.
+ * Push-announce a change to every open browser via Supabase Realtime
+ * broadcast. Uses supabase-js over WebSocket (works in Workers runtime).
+ * This delivers push WITHOUT requiring table publications.
  */
 async function announce(env: Record<string, string | undefined>, payload: { table: string; row_id: string }) {
-  const key = env.SUPABASE_SERVICE_ROLE_KEY!
-  const wsUrl = `${env.SUPABASE_URL!.replace(/^https:/, "wss:")}/realtime/v1/websocket?apikey=${key}&vsn=1.0.0`
-  let ws: WebSocket | null = null
   try {
-    ws = new WebSocket(wsUrl)
-    const joined = new Promise<void>((resolve, reject) => {
-      if (!ws) return reject(new Error("no socket"))
-      const t = setTimeout(() => reject(new Error("join timeout")), 2000)
-      ws.addEventListener("open", () => {
-        ws!.send(JSON.stringify(["1", "1", "realtime:afkar-live-sync", "phx_join", {
-          config: { broadcast: { self: false }, presence: { key: `webhook-${Date.now()}` } },
-          access_token: key,
-        }]))
-      })
-      ws.addEventListener("message", (ev: MessageEvent) => {
-        try {
-          const msg = JSON.parse(String(ev.data))
-          if (Array.isArray(msg) && msg[3] === "phx_reply" && msg[4]?.status === "ok") { clearTimeout(t); resolve() }
-          if (Array.isArray(msg) && msg[3] === "phx_reply" && msg[4]?.status !== "ok") { clearTimeout(t); reject(new Error("join rejected")) }
-        } catch { /* ignore */ }
-      })
-      ws.addEventListener("error", () => { clearTimeout(t); reject(new Error("ws error")) })
+    const sb = createClient(env.SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      realtime: { params: { eventsPerSecond: 10 } },
     })
-    await joined
-    ws.send(JSON.stringify(["1", "2", "realtime:afkar-live-sync", "broadcast", {
-      type: "broadcast", event: "salla-sync", payload,
-    }]))
-    await sleep(150) // give the frame a beat to flush
-  } catch {
-    // non-fatal — polling fallback covers delivery
-  } finally {
-    try { ws?.close() } catch { /* ignore */ }
+    const ch = sb.channel("afkar-live-sync", { config: { broadcast: { self: false } } })
+    const joined = await new Promise<boolean>((resolve) => {
+      const t = setTimeout(() => resolve(false), 2500)
+      ch.subscribe((status) => {
+        if (status === "SUBSCRIBED") { clearTimeout(t); resolve(true) }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") { clearTimeout(t); resolve(false) }
+      })
+    })
+    if (!joined) {
+      console.error("[salla-webhook announce] join failed")
+      return
+    }
+    const sent = await ch.send({ type: "broadcast", event: "salla-sync", payload })
+    if (sent !== "ok") console.error("[salla-webhook announce] send result:", sent)
+    setTimeout(() => { void sb.removeChannel(ch).catch(() => {}) }, 250)
+  } catch (e) {
+    console.error("[salla-webhook announce] error:", String(e).slice(0, 300))
   }
 }
 
