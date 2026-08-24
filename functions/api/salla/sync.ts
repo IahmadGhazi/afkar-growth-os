@@ -99,6 +99,14 @@ export async function onRequest(context: { request: Request; env: Record<string,
 
   // ---- SYNC ORDERS ----
   try {
+    // Build a map of Salla customer IDs to our customer row IDs for linking
+    const custRes = await fetch(`${env.SUPABASE_URL}/rest/v1/customers?client_id=eq.${clientId}&select=id,salla_id`, {
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
+    })
+    const custList = custRes.ok ? (await custRes.json()) as Array<{ id: string; salla_id: number | null }> : []
+    const custMap = new Map<number, string>()
+    for (const c of custList) { if (c.salla_id) custMap.set(c.salla_id, c.id) }
+
     let page = 1
     let total = 0
     while (page <= 10) {
@@ -106,17 +114,23 @@ export async function onRequest(context: { request: Request; env: Record<string,
       const list = (body?.data ?? []) as any[]
       for (const o of list) {
         const totalAmt = typeof o.total === 'number' ? o.total : num(o.amounts?.total?.amount)
+        // Resolve the linked customer by their Salla ID
+        const sallaCustId = typeof o.customer?.id === "number" ? o.customer.id
+          : typeof o.customer_id === "number" ? o.customer_id : null
         await upsert("orders", {
           id: `ord_salla_${o.id}`, client_id: clientId, salla_id: o.id,
-          status: o.status ?? "payment_completed",
-          payment_method: o.payment_method ?? null,
+          customer_id: sallaCustId ? (custMap.get(sallaCustId) ?? null) : null,
+          status: typeof o.status === "string" ? o.status : (o.status?.slug ?? o.status?.name ?? "payment_completed"),
+          payment_method: typeof o.payment_method === "string" ? o.payment_method : (o.payment_method?.slug ?? null),
           selling_channel: o.selling_channel ?? null,
           total_amount: totalAmt,
           shipping_cost: num(o.amounts?.shipping?.amount),
           tax_amount: num(o.amounts?.tax?.amount),
           currency: o.amounts?.total?.currency ?? "SAR",
           items_count: Array.isArray(o.items) ? o.items.length : 0,
-          items: o.items ?? [],
+          items: Array.isArray(o.items)
+            ? o.items.map((it: any) => ({ name: it.name, quantity: it.quantity, amount: it.amounts?.price?.amount ?? null }))
+            : [],
           date_created: o.date?.date ?? null,
           date_completed: o.completed_at?.date ?? null,
           synced_at: now,
