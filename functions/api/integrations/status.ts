@@ -1,11 +1,15 @@
 /**
- * GET/POST /api/integrations/status — which ad platforms have credentials.
- * Ghazi pattern: booleans + non-secret labels only; secrets never leave the
- * server. Staff gate: admin / account_manager / media_buyer.
+ * GET /api/integrations/status — which platforms are connected and how.
+ *
+ * Salla: checks the integration_tokens TABLE (OAuth tokens stored by the
+ *   app.store.authorize webhook). NOT env vars — Salla tokens are dynamic.
+ * Google/TikTok/Snap/Meta: checks ENV VARS (static API keys).
+ *
+ * Staff gate: admin / account_manager / media_buyer.
  */
-type Platform = "google_ads" | "tiktok_ads" | "snap_ads" | "salla" | "meta"
+type Platform = "salla" | "google_ads" | "tiktok_ads" | "snap_ads" | "meta"
 
-const CREDENTIALS: Record<Platform, { secret: string[]; account?: string }> = {
+const ENV_CREDENTIALS: Record<string, { secret: string[]; account?: string }> = {
   google_ads: {
     secret: ["GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET", "GOOGLE_ADS_DEVELOPER_TOKEN", "GOOGLE_ADS_REFRESH_TOKEN"],
     account: "GOOGLE_ADS_CUSTOMER_ID",
@@ -17,10 +21,6 @@ const CREDENTIALS: Record<Platform, { secret: string[]; account?: string }> = {
   snap_ads: {
     secret: ["SNAP_CLIENT_ID", "SNAP_CLIENT_SECRET", "SNAP_REFRESH_TOKEN"],
     account: "SNAP_AD_ACCOUNT_ID",
-  },
-  salla: {
-    secret: ["SALLA_CLIENT_ID", "SALLA_CLIENT_SECRET", "SALLA_REFRESH_TOKEN"],
-    account: "SALLA_STORE_ID",
   },
   meta: {
     secret: ["META_ACCESS_TOKEN"],
@@ -34,20 +34,18 @@ const json = (b: unknown, s = 200) =>
 
 export async function onRequest(context: { request: Request; env: Record<string, string | undefined> }) {
   const { request, env } = context
-  if (!["GET", "POST"].includes(request.method)) return json({ error: "POST/GET only" }, 405)
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "not_configured" }, 501)
 
-  const url = env.SUPABASE_URL
-  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
   const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "")
   let role: string | null = null
-  if (url && serviceKey && token) {
+  if (token) {
     try {
-      const me = await fetch(`${url}/auth/v1/user`, { headers: { apikey: serviceKey, authorization: `Bearer ${token}` } })
+      const me = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${token}` } })
       if (me.ok) {
         const meJson = (await me.json()) as { id?: string }
         if (meJson.id) {
-          const prof = await fetch(`${url}/rest/v1/profiles?auth_user_id=eq.${meJson.id}&select=role`, {
-            headers: { apikey: serviceKey, authorization: `Bearer ${serviceKey}` },
+          const prof = await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?auth_user_id=eq.${meJson.id}&select=role`, {
+            headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
           })
           if (prof.ok) role = ((await prof.json()) as { role?: string }[])?.[0]?.role ?? null
         }
@@ -57,12 +55,41 @@ export async function onRequest(context: { request: Request; env: Record<string,
   if (!role) return json({ error: "unauthorized" }, 401)
   if (!STAFF.has(role)) return json({ error: "forbidden" }, 403)
 
-  const platforms = Object.fromEntries(
-    (Object.keys(CREDENTIALS) as Platform[]).map((id) => {
-      const { secret, account } = CREDENTIALS[id]
-      const configured = secret.every((k) => Boolean(env[k]))
-      return [id, { configured, account: account ? env[account] ?? null : null, missing: configured ? [] : secret.filter((k) => !env[k]) }]
-    }),
-  )
-  return json({ platforms }, 200)
+  const H = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` }
+
+  // Salla: check integration_tokens TABLE (OAuth tokens stored by webhook)
+  let sallaConfigured = false
+  let sallaAccount: string | null = null
+  try {
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?platform=eq.salla&select=store_name,store_id`, { headers: H })
+    const tokens = (await res.json()) as Array<{ store_name?: string; store_id?: string }>
+    if (tokens.length > 0) {
+      sallaConfigured = true
+      sallaAccount = tokens[0].store_name ?? tokens[0].store_id ?? null
+    }
+  } catch { sallaConfigured = false }
+
+  const sallaStatus = {
+    configured: sallaConfigured,
+    account: sallaAccount,
+    missing: sallaConfigured ? [] : ["Install the app on your Salla store"],
+  }
+
+  // Other platforms: check env vars
+  const envPlatforms: Record<string, { configured: boolean; account: string | null; missing: string[] }> = {}
+  for (const [id, cred] of Object.entries(ENV_CREDENTIALS)) {
+    const configured = cred.secret.every((k) => Boolean(env[k]))
+    envPlatforms[id] = {
+      configured,
+      account: cred.account ? env[cred.account] ?? null : null,
+      missing: configured ? [] : cred.secret.filter((k) => !env[k]),
+    }
+  }
+
+  return json({
+    platforms: {
+      salla: sallaStatus,
+      ...envPlatforms,
+    },
+  }, 200)
 }
