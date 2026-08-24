@@ -46,6 +46,15 @@ export async function onRequest(context: { request: Request; env: Record<string,
   const now = new Date().toISOString()
   const results: Record<string, string> = {}
 
+  // Helper: paginated GET from Salla API
+  async function sallaGet(path: string, params: Record<string, string> = {}) {
+    const url = new URL(`${BASE}${path}`)
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
+    const res = await fetch(url.toString(), { headers: sallaH, signal: AbortSignal.timeout(15000) })
+    if (!res.ok) throw new Error(`Salla API ${res.status}: ${(await res.text()).slice(0, 200)}`)
+    return res.json()
+  }
+
   // Helper: upsert a row into Supabase and CHECK the response
   async function upsert(table: string, row: Record<string, unknown>) {
     const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?on_conflict=id`, {
