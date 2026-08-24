@@ -46,6 +46,13 @@ export async function onRequest(context: { request: Request; env: Record<string,
   const now = new Date().toISOString()
   const results: Record<string, string> = {}
 
+  // Helper: coerce unknown Salla value to number or null
+  function num(v: unknown): number | null {
+    if (typeof v === "number" && Number.isFinite(v)) return v
+    if (typeof v === "string" && v.trim() !== "" && !isNaN(parseFloat(v))) return parseFloat(v)
+    return null
+  }
+
   // Helper: paginated GET from Salla API
   async function sallaGet(path: string, params: Record<string, string> = {}) {
     const url = new URL(`${BASE}${path}`)
@@ -98,15 +105,16 @@ export async function onRequest(context: { request: Request; env: Record<string,
       const body = await sallaGet("/orders", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const o of list) {
+        const totalAmt = typeof o.total === 'number' ? o.total : num(o.amounts?.total?.amount)
         await upsert("orders", {
           id: `ord_salla_${o.id}`, client_id: clientId, salla_id: o.id,
           status: o.status ?? "payment_completed",
           payment_method: o.payment_method ?? null,
           selling_channel: o.selling_channel ?? null,
-          total_amount: o.amounts?.total?.amount ?? o.total ?? 0,
-          shipping_cost: o.amounts?.shipping?.amount ?? 0,
-          tax_amount: o.amounts?.tax?.amount ?? 0,
-          currency: o.currency ?? "SAR",
+          total_amount: totalAmt,
+          shipping_cost: num(o.amounts?.shipping?.amount),
+          tax_amount: num(o.amounts?.tax?.amount),
+          currency: o.amounts?.total?.currency ?? "SAR",
           items_count: Array.isArray(o.items) ? o.items.length : 0,
           items: o.items ?? [],
           date_created: o.date?.date ?? null,
@@ -130,15 +138,16 @@ export async function onRequest(context: { request: Request; env: Record<string,
       const body = await sallaGet("/products", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const p of list) {
+        const statusMap: Record<string, string> = { sale: "active", available: "active", hidden: "hidden", out_of_stock: "out_of_stock" }
         await upsert("store_products", {
           id: `sp_salla_${p.id}`, client_id: clientId, salla_id: p.id,
           name: p.name, sku: p.sku,
-          price: p.price?.amount ?? null,
-          sale_price: p.sale_price?.amount ?? null,
-          status: p.status ?? "active",
+          price: num(p.price?.amount),
+          sale_price: num(p.sale_price?.amount),
+          status: statusMap[p.status] ?? "active",
           category: p.categories?.[0]?.name ?? null,
           image_url: p.thumbnail ?? null,
-          quantity: p.quantity ?? 0,
+          quantity: num(p.quantity) ?? 0,
           synced_at: now,
         })
         total++
