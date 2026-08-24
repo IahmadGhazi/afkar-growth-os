@@ -16,6 +16,49 @@ const statusOf = (v: unknown): string =>
   typeof v === "string" ? v : ((v as any)?.slug ?? (v as any)?.name ?? "unknown")
 const PROD_STATUS: Record<string, string> = { sale: "active", available: "active", hidden: "hidden", out_of_stock: "out_of_stock" }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Push-announce a change to every open browser via a Supabase Realtime
+ * broadcast (Phoenix protocol over raw WebSocket). This works WITHOUT the
+ * table publications — the webhook itself becomes the push signal.
+ */
+async function announce(env: Record<string, string | undefined>, payload: { table: string; row_id: string }) {
+  const key = env.SUPABASE_SERVICE_ROLE_KEY!
+  const wsUrl = `${env.SUPABASE_URL!.replace(/^https:/, "wss:")}/realtime/v1/websocket?apikey=${key}&vsn=1.0.0`
+  let ws: WebSocket | null = null
+  try {
+    ws = new WebSocket(wsUrl)
+    const joined = new Promise<void>((resolve, reject) => {
+      if (!ws) return reject(new Error("no socket"))
+      const t = setTimeout(() => reject(new Error("join timeout")), 2000)
+      ws.addEventListener("open", () => {
+        ws!.send(JSON.stringify(["1", "1", "realtime:afkar-live-sync", "phx_join", {
+          config: { broadcast: { self: false }, presence: { key: `webhook-${Date.now()}` } },
+          access_token: key,
+        }]))
+      })
+      ws.addEventListener("message", (ev: MessageEvent) => {
+        try {
+          const msg = JSON.parse(String(ev.data))
+          if (Array.isArray(msg) && msg[3] === "phx_reply" && msg[4]?.status === "ok") { clearTimeout(t); resolve() }
+          if (Array.isArray(msg) && msg[3] === "phx_reply" && msg[4]?.status !== "ok") { clearTimeout(t); reject(new Error("join rejected")) }
+        } catch { /* ignore */ }
+      })
+      ws.addEventListener("error", () => { clearTimeout(t); reject(new Error("ws error")) })
+    })
+    await joined
+    ws.send(JSON.stringify(["1", "2", "realtime:afkar-live-sync", "broadcast", {
+      type: "broadcast", event: "salla-sync", payload,
+    }]))
+    await sleep(150) // give the frame a beat to flush
+  } catch {
+    // non-fatal — polling fallback covers delivery
+  } finally {
+    try { ws?.close() } catch { /* ignore */ }
+  }
+}
+
 export async function onRequest(context: { request: Request; env: Record<string, string | undefined> }) {
   const { request, env } = context
   if (request.method !== "POST") return json({ error: "POST only" }, 405)
@@ -118,6 +161,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
           method: "POST", headers: H,
           body: JSON.stringify({ id: eventId, order_id: orderId, client_id: clientId, event: body.event, details: {}, event_time: now }),
         })
+        await announce(env, { table: "orders", row_id: orderId })
         break
       }
       case "order.status.updated": {
@@ -137,6 +181,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
             body: JSON.stringify({ id: `sla_${orderId}`, order_id: orderId, client_id: clientId, sla_state: "resolved", updated_at: now }),
           })
         }
+        await announce(env, { table: "orders", row_id: orderId })
         break
       }
       case "customer.created":
@@ -149,6 +194,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
           gender: c.gender, city: c.city, country: c.country,
           avatar_url: c.avatar, synced_at: now,
         })
+        await announce(env, { table: "customers", row_id: `cust_salla_${c.id}` })
         break
       }
       case "product.created":
@@ -165,6 +211,7 @@ export async function onRequest(context: { request: Request; env: Record<string,
           quantity: num(p.quantity) ?? 0,
           synced_at: now,
         })
+        await announce(env, { table: "store_products", row_id: `sp_salla_${p.id}` })
         break
       }
       case "shipment.created":

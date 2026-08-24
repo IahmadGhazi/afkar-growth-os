@@ -1,22 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { ShoppingCart, UserPlus, Package, Star, Zap } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { ShoppingCart, UserPlus, Package, Zap } from 'lucide-react'
+import type { SallaCustomer, SallaOrder, SallaProduct } from '../../types/database'
 
-type PulseKind = 'order' | 'customer' | 'product' | 'review'
+type PulseKind = 'order' | 'customer' | 'product'
 
-interface PulseItem {
+export interface PulseItem {
   key: string
   kind: PulseKind
   title: string
   detail: string
-  at: number // epoch ms of the event
+  at: number
 }
 
-const KIND_META: Record<PulseKind, { icon: typeof ShoppingCart; color: string; bg: string; label: string }> = {
-  order: { icon: ShoppingCart, color: '#d29a0c', bg: 'rgba(240,196,46,.12)', label: 'Order' },
-  customer: { icon: UserPlus, color: '#10b981', bg: 'rgba(16,185,129,.12)', label: 'Customer' },
-  product: { icon: Package, color: '#8b5cf6', bg: 'rgba(139,92,246,.12)', label: 'Product' },
-  review: { icon: Star, color: '#f59e0b', bg: 'rgba(245,158,11,.12)', label: 'Review' },
+const KIND_META: Record<PulseKind, { icon: typeof ShoppingCart; color: string; bg: string }> = {
+  order: { icon: ShoppingCart, color: '#d29a0c', bg: 'rgba(240,196,46,.12)' },
+  customer: { icon: UserPlus, color: '#10b981', bg: 'rgba(16,185,129,.12)' },
+  product: { icon: Package, color: '#8b5cf6', bg: 'rgba(139,92,246,.12)' },
 }
 
 function ago(t: number): string {
@@ -30,108 +29,79 @@ function ago(t: number): string {
   return `${Math.floor(h / 24)}d ago`
 }
 
-/**
- * Store Pulse — live heartbeat of the store.
- * Subscribes to Salla tables via Supabase Realtime AND polls as a safety
- * net every 30s (only while the tab is visible), so new orders/customers/
- * products appear without any refresh even if realtime is unavailable.
- */
-export function useStorePulse(enabled: boolean) {
-  const [items, setItems] = useState<PulseItem[]>([])
-  const [live, setLive] = useState(false)
-  const lastPoll = useRef(Date.now())
-  const mounted = useRef(true)
-
-  useEffect(() => {
-    mounted.current = true
-    if (!enabled || !supabase) return
-
-    const push = (it: PulseItem) => {
-      if (!mounted.current) return
-      setItems((prev) => [it, ...prev.filter((p) => p.key !== it.key)].slice(0, 30))
-    }
-
-    const describe = (kind: PulseKind, row: Record<string, unknown>): PulseItem => {
-      if (kind === 'order') {
-        const amt = Number(row.total_amount ?? 0)
-        return {
-          key: String(row.id), kind,
-          title: `Order #${String(row.salla_id ?? row.id).replace('ord_salla_', '')} · ${amt.toLocaleString()} ${row.currency ?? 'SAR'}`,
-          detail: `${row.items_count ?? 0} items · ${String(row.status ?? '').replace(/_/g, ' ')}`,
-          at: Date.now(),
-        }
-      }
-      if (kind === 'customer') {
-        const name = [row.first_name, row.last_name].filter(Boolean).join(' ') || 'New customer'
-        return { key: String(row.id), kind, title: name, detail: row.city ? `Joined from ${row.city}` : 'Joined your store', at: Date.now() }
-      }
-      if (kind === 'product') {
-        return { key: String(row.id), kind, title: String(row.name ?? 'Product updated'), detail: row.price != null ? `Price ${Number(row.price).toLocaleString()} SAR` : 'Catalog updated', at: Date.now() }
-      }
-      return {
-        key: String(row.id), kind,
-        title: `${'★'.repeat(Math.min(5, Number(row.rating ?? 0))) || 'Review'} ${row.product_name ?? ''}`.trim(),
-        detail: String(row.content ?? '').slice(0, 80),
-        at: Date.now(),
-      }
-    }
-
-    // ── seed from what already exists in memory (recent rows) via REST
-    ;(async () => {
-      if (!supabase) return
-      try {
-        const since = new Date(Date.now() - 6 * 3600_000).toISOString()
-        const res = await supabase.from('orders').select('*').gte('synced_at', since).order('synced_at', { ascending: false }).limit(10)
-        if (!res.error && res.data) {
-          for (const row of res.data.reverse()) {
-            const it = describe('order', row as Record<string, unknown>)
-            it.at = new Date(String(row.synced_at)).getTime()
-            push(it)
-          }
-        }
-      } catch { /* non-fatal */ }
-    })()
-
-    // ── realtime subscription
-    const ch = supabase.channel('store-pulse', { config: { broadcast: { self: false } } })
-    for (const table of ['orders', 'customers', 'store_products']) {
-      ch.on('postgres_changes' as never, { event: 'INSERT', schema: 'public', table } as never, (payload: { new?: Record<string, unknown> }) => {
-        setLive(true)
-        const kind: PulseKind = table === 'orders' ? 'order' : table === 'customers' ? 'customer' : 'product'
-        if (payload.new) push(describe(kind, payload.new))
-      })
-    }
-    ch.subscribe((status) => { if (status === 'SUBSCRIBED') setLive(true) })
-
-    // ── polling fallback: catches webhooks even when realtime is blocked
-    const poll = async () => {
-      if (!supabase || document.hidden) return
-      const since = new Date(lastPoll.current).toISOString()
-      lastPoll.current = Date.now()
-      try {
-        const res = await supabase.from('orders').select('*').gte('synced_at', since).order('synced_at', { ascending: false }).limit(10)
-        if (!res.error && res.data?.length) {
-          for (const row of res.data) push(describe('order', row as Record<string, unknown>))
-        }
-      } catch { /* non-fatal */ }
-    }
-    const timer = setInterval(poll, 30_000)
-
-    return () => {
-      mounted.current = false
-      clearInterval(timer)
-      if (supabase) void supabase.removeChannel(ch)
-    }
-  }, [enabled])
-
-  return { items, live }
+interface PulseProps {
+  orders: SallaOrder[]
+  customers: SallaCustomer[]
+  products: SallaProduct[]
 }
 
-export function StorePulse({ enabled }: { enabled: boolean }) {
-  const { items, live } = useStorePulse(enabled)
+/**
+ * Store Pulse — derives live activity by diffing app state.
+ * Every refresh path (webhook broadcast push, realtime postgres_changes,
+ * safety-net poll, manual sync) flows through state → new rows animate in.
+ */
+export function StorePulse({ orders, customers, products }: PulseProps) {
+  const [items, setItems] = useState<PulseItem[]>([])
+  const known = useRef<Map<PulseKind, Set<string>> | null>(null)
   const [, force] = useState(0)
 
-  // re-render "x ago" labels periodically
+  const orderItem = (o: SallaOrder): PulseItem => ({
+    key: o.id,
+    kind: 'order',
+    title: `Order #${String(o.salla_id ?? o.id).replace('ord_salla_', '')} · ${(o.total_amount ?? 0).toLocaleString()} ${o.currency ?? 'SAR'}`,
+    detail: `${o.items_count ?? 0} items · ${String(o.status ?? '').replace(/_/g, ' ')}`,
+    at: new Date(o.synced_at ?? Date.now()).getTime(),
+  })
+
+  // Seed + diff
+  useEffect(() => {
+    if (!known.current) {
+      // First render: remember everything that already exists; show recent orders only
+      known.current = new Map([
+        ['order', new Set((orders ?? []).map((o) => o.id))],
+        ['customer', new Set((customers ?? []).map((c) => String(c.id)))],
+        ['product', new Set((products ?? []).map((p) => String(p.id)))],
+      ])
+      const seed = [...(orders ?? [])]
+        .sort((a, b) => new Date(b.synced_at).getTime() - new Date(a.synced_at).getTime())
+        .slice(0, 6)
+        .map(orderItem)
+      setItems(seed)
+      return
+    }
+
+    const fresh: PulseItem[] = []
+    const kOrders = known.current.get('order')!
+    for (const o of orders ?? []) if (!kOrders.has(o.id)) { kOrders.add(o.id); fresh.push(orderItem(o)) }
+    const kCust = known.current.get('customer')!
+    for (const c of customers ?? []) {
+      const id = String(c.id)
+      if (!kCust.has(id)) {
+        kCust.add(id)
+        fresh.push({
+          key: id, kind: 'customer',
+          title: ([c.first_name as string, c.last_name as string].filter(Boolean).join(' ') || 'New customer'),
+          detail: c.city ? `Joined from ${String(c.city)}` : 'Joined your store',
+          at: new Date(String(c.synced_at ?? Date.now())).getTime(),
+        })
+      }
+    }
+    const kProd = known.current.get('product')!
+    for (const p of products ?? []) {
+      const id = String(p.id)
+      if (!kProd.has(id)) {
+        kProd.add(id)
+        fresh.push({
+          key: id, kind: 'product',
+          title: String(p.name ?? 'Product updated'),
+          detail: p.price != null ? `Price ${Number(p.price).toLocaleString()} SAR` : 'Catalog updated',
+          at: new Date(String(p.synced_at ?? Date.now())).getTime(),
+        })
+      }
+    }
+    if (fresh.length) setItems((prev) => [...fresh.reverse(), ...prev].slice(0, 30))
+  }, [orders, customers, products])
+
   useEffect(() => {
     const t = setInterval(() => force((n) => n + 1), 15_000)
     return () => clearInterval(t)
@@ -141,12 +111,12 @@ export function StorePulse({ enabled }: { enabled: boolean }) {
     <div className="glass-card p-5 relative overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Zap size={15} style={{ color: live ? '#d29a0c' : 'var(--text-muted)' }} />
+          <Zap size={15} style={{ color: '#d29a0c' }} />
           <span className="text-sm font-semibold text-[var(--text-primary)]">Store Pulse</span>
         </div>
-        <span className="flex items-center gap-1.5 text-[11px]" style={{ color: live ? '#10b981' : 'var(--text-muted)' }}>
-          <span className={`w-1.5 h-1.5 rounded-full ${live ? 'animate-pulse' : ''}`} style={{ background: live ? '#10b981' : 'var(--text-muted)' }} />
-          {live ? 'Live' : 'Connecting…'}
+        <span className="flex items-center gap-1.5 text-[11px] text-[#10b981]">
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10b981' }} />
+          Live
         </span>
       </div>
 
@@ -160,7 +130,7 @@ export function StorePulse({ enabled }: { enabled: boolean }) {
             const meta = KIND_META[it.kind]
             const Icon = meta.icon
             return (
-              <div key={it.key} className="flex items-start gap-3 rounded-lg px-3 py-2.5 border border-[var(--hairline)] bg-[var(--card)] animate-[pulseIn_.45s_var(--ease-spring)_both]" style={{ ['--delay' as string]: '0s' }}>
+              <div key={it.key} className="flex items-start gap-3 rounded-lg px-3 py-2.5 border border-[var(--hairline)] bg-[var(--card)]" style={{ animation: 'pulseIn .45s var(--ease-spring) both' }}>
                 <span className="w-7 h-7 rounded-md flex items-center justify-center shrink-0" style={{ background: meta.bg }}>
                   <Icon size={13} style={{ color: meta.color }} />
                 </span>

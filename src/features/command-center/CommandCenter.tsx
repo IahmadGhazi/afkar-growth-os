@@ -472,7 +472,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
         {/* Store Pulse — live heartbeat of the store */}
         <section className="lg:col-span-1 order-first lg:order-none">
           <SectionTitle>Store Pulse</SectionTitle>
-          <StorePulse enabled={true} />
+          <StorePulse orders={state.sallaOrders ?? []} customers={state.sallaCustomers ?? []} products={state.sallaProducts ?? []} />
         </section>
 
         {/* Needs Attention */}
