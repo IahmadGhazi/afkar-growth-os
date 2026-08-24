@@ -10,6 +10,8 @@ import {
   FileSpreadsheet,
   Download,
   FileDown,
+  Check,
+  AlertTriangle,
 } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { currentClient, kpisForClient, getConnection } from '../../lib/selectors'
@@ -348,6 +350,31 @@ export function Data() {
         <Zap size={14} />
         <span>{client?.name ?? 'Client'}</span>
       </div>
+
+      {/* OAuth callback result banner */}
+      {(() => {
+        const params = new URLSearchParams(window.location.search)
+        const sallaStatus = params.get('salla')
+        if (!sallaStatus) return null
+        const store = params.get('store')
+        const reason = params.get('reason')
+        if (sallaStatus === 'connected') {
+          return (
+            <div className="rounded-xl bg-[var(--positive-soft)] text-[var(--positive)] px-4 py-3 text-sm font-medium flex items-center gap-2">
+              <Check size={16} /> Salla connected: {store ?? 'your store'}
+            </div>
+          )
+        }
+        if (sallaStatus === 'error') {
+          return (
+            <div className="rounded-xl bg-[var(--critical-soft)] text-[var(--critical)] px-4 py-3 text-sm flex items-start gap-2">
+              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+              <span>Salla connection failed: {reason ?? 'unknown error'}</span>
+            </div>
+          )
+        }
+        return null
+      })()}
 
       {/* Live platform integrations — THE ONLY connection interface */}
       <section>
