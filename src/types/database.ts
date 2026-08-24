@@ -294,6 +294,49 @@ export interface SallaReview {
   created_at: string
 }
 
+export interface SallaShipment {
+  id: string
+  client_id: string
+  order_id: string | null
+  salla_shipment_id: number | null
+  status: 'creating' | 'created' | 'updated' | 'cancelled' | 'delivered'
+  shipping_company: string | null
+  tracking_number: string | null
+  shipment_date: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OrderSla {
+  id: string
+  order_id: string
+  client_id: string
+  sla_state: 'normal' | 'at_risk' | 'delayed' | 'resolved'
+  created_at: string
+  updated_at: string
+}
+
+export interface OrderTimelineEvent {
+  id: string
+  order_id: string
+  client_id: string
+  event: string
+  details: Record<string, unknown> | null
+  event_time: string
+}
+
+export interface AbandonedCart {
+  id: string
+  client_id: string
+  salla_cart_id: number | null
+  customer_id: string | null
+  status: 'abandoned' | 'updated' | 'purchased' | 'status_changed'
+  cart_total: number
+  items: Array<{ name: string; qty: number }> | null
+  created_at: string
+  updated_at: string
+}
+
 export interface IntegrationToken {
   id: string
   client_id: string

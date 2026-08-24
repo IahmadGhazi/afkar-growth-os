@@ -70,7 +70,7 @@ export const backend = {
   available: backendAvailable,
 
   async loadAll() {
-    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages, reportNotes, products, campaigns, campaignMetrics, taskComments, sallaCustomers, sallaOrders, sallaProducts, sallaReviews] =
+    const [organization, clients, profiles, clientAssignments, tasks, objectives, keyResults, kpiDefinitions, kpiTargets, kpiSnapshots, connections, syncLog, notifications, activity, messages, reportNotes, products, campaigns, campaignMetrics, taskComments, sallaCustomers, sallaOrders, sallaProducts, sallaReviews, shipments, orderSlas, orderTimeline, abandonedCarts] =
       await Promise.all([
         selectAllSafe<Organization>('organizations'),
         selectAllSafe<Client>('clients'),
@@ -96,6 +96,10 @@ export const backend = {
         selectAllSafe<SallaOrder>('orders', 'date_created'),
         selectAllSafe<SallaProduct>('store_products'),
         selectAllSafe<SallaReview>('reviews', 'created_at'),
+        selectAllSafe<any>('shipments', 'created_at'),
+        selectAllSafe<any>('order_sla', 'updated_at'),
+        selectAllSafe<any>('order_timeline', 'event_time'),
+        selectAllSafe<any>('abandoned_carts', 'created_at'),
       ])
     return {
       organization: organization[0] ?? null,
@@ -122,6 +126,10 @@ export const backend = {
       sallaOrders,
       sallaProducts,
       sallaReviews,
+      shipments,
+      orderSlas,
+      orderTimeline,
+      abandonedCarts,
     }
   },
 

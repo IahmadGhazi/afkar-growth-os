@@ -51,6 +51,10 @@ export interface AppState {
   sallaOrders: SallaOrder[]
   sallaProducts: SallaProduct[]
   sallaReviews: SallaReview[]
+  shipments: any[]
+  orderSlas: any[]
+  orderTimeline: any[]
+  abandonedCarts: any[]
   currentUserId: string | null
   currentClientId: string | null
   /** False until the first backend bootstrap resolves; the shell shows a

@@ -69,6 +69,10 @@ function emptyState(): AppState {
     sallaOrders: [],
     sallaProducts: [],
     sallaReviews: [],
+    shipments: [],
+    orderSlas: [],
+    orderTimeline: [],
+    abandonedCarts: [],
     currentUserId: null,
     currentClientId: null,
     ready: false,
@@ -180,6 +184,10 @@ async function refreshFromServer() {
       sallaOrders: data.sallaOrders,
       sallaProducts: data.sallaProducts,
       sallaReviews: data.sallaReviews,
+      shipments: data.shipments,
+      orderSlas: data.orderSlas,
+      orderTimeline: data.orderTimeline,
+      abandonedCarts: data.abandonedCarts,
     }))
     sweepOverdue()
   } catch (err) {
@@ -225,6 +233,14 @@ async function bootstrap() {
         campaignMetrics: data.campaignMetrics,
         taskComments: data.taskComments,
         reportNotes: data.reportNotes,
+        sallaCustomers: data.sallaCustomers,
+        sallaOrders: data.sallaOrders,
+        sallaProducts: data.sallaProducts,
+        sallaReviews: data.sallaReviews,
+        shipments: data.shipments,
+        orderSlas: data.orderSlas,
+        orderTimeline: data.orderTimeline,
+        abandonedCarts: data.abandonedCarts,
       }
       let currentUserId: string | null = null
       if (authUser) {

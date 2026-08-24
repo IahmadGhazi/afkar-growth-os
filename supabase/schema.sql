@@ -350,16 +350,51 @@ create table if not exists public.integration_tokens (
   updated_at timestamptz not null default now(),
   unique (client_id, platform)
 );
+
+-- ---------- SALLA SHIPMENTS ----------
+create table if not exists public.shipments (
   id text primary key,
   client_id text not null references public.clients(id) on delete cascade,
-  name text not null,
-  platform text not null default 'other' check (platform in ('google_ads','tiktok_ads','snap_ads','salla','other')),
-  status text not null default 'planned' check (status in ('planned','active','paused','completed','archived')),
-  budget numeric,
-  objective text,
-  start_date date,
-  end_date date,
-  created_by text references public.profiles(id) on delete set null,
+  order_id text references public.orders(id) on delete set null,
+  salla_shipment_id integer,
+  status text not null default 'creating' check (status in ('creating','created','updated','cancelled','delivered')),
+  shipping_company text,
+  tracking_number text,
+  shipment_date timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ---------- ORDER SLA TRACKING ----------
+create table if not exists public.order_sla (
+  id text primary key,
+  order_id text not null references public.orders(id) on delete cascade,
+  client_id text not null references public.clients(id) on delete cascade,
+  sla_state text not null default 'normal' check (sla_state in ('normal','at_risk','delayed','resolved')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (order_id)
+);
+
+-- ---------- ORDER TIMELINE (full event history per order) ----------
+create table if not exists public.order_timeline (
+  id text primary key,
+  order_id text not null references public.orders(id) on delete cascade,
+  client_id text not null references public.clients(id) on delete cascade,
+  event text not null,
+  details jsonb,
+  event_time timestamptz not null default now()
+);
+
+-- ---------- ABANDONED CARTS ----------
+create table if not exists public.abandoned_carts (
+  id text primary key,
+  client_id text not null references public.clients(id) on delete cascade,
+  salla_cart_id integer unique,
+  customer_id text references public.customers(id) on delete set null,
+  status text not null default 'abandoned' check (status in ('abandoned','updated','purchased','status_changed')),
+  cart_total numeric not null default 0,
+  items jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -659,6 +694,26 @@ do $$ begin
   create policy "team full access platform_accounts" on public.platform_accounts for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; when others then null; end $$;
 
+-- RLS for shipments, SLA, timeline, abandoned carts
+do $$ begin
+  alter table public.shipments enable row level security;
+  alter table public.order_sla enable row level security;
+  alter table public.order_timeline enable row level security;
+  alter table public.abandoned_carts enable row level security;
+exception when others then null; end $$;
+do $$ begin
+  create policy "team full access shipments" on public.shipments for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
+  create policy "team full access order_sla" on public.order_sla for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
+  create policy "team full access order_timeline" on public.order_timeline for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+do $$ begin
+  create policy "team full access abandoned_carts" on public.abandoned_carts for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; when others then null; end $$;
+
 -- client_reports policies (new table, hardened pattern)
 do $$ begin
   drop policy if exists "anon full access client_reports" on public.client_reports;
@@ -951,6 +1006,32 @@ insert into public.reviews (id, client_id, salla_id, type, rating, content, cust
   ('rev_2', 'cli_afkar', 4002, 'product', 4, 'Good quality but delivery took longer than expected.', 'Nouf S.', 'Neon Islamic Calligraphy Frame', true, now() - interval '2 weeks'),
   ('rev_3', 'cli_afkar', 4003, 'product', 5, 'The 3D map is a masterpiece. Worth every riyal.', 'Khalid G.', '3D Wooden World Map XL', true, now() - interval '3 days'),
   ('rev_4', 'cli_afkar', 4004, 'store', 4, 'Great store, beautiful products, will order again.', 'Reem S.', null, true, now() - interval '1 week')
+on conflict (id) do nothing;
+
+-- Shipments + SLA + timeline + abandoned carts seed
+insert into public.shipments (id, client_id, order_id, salla_shipment_id, status, shipping_company, tracking_number, shipment_date) values
+  ('shp_1', 'cli_afkar', 'ord_1', 5001, 'delivered', 'Aramex', 'ARX123456', now() - interval '2 days'),
+  ('shp_2', 'cli_afkar', 'ord_2', 5002, 'created', 'SMSA', 'SMS789012', now() - interval '4 days')
+on conflict (id) do nothing;
+
+insert into public.order_sla (id, order_id, client_id, sla_state, updated_at) values
+  ('sla_1', 'ord_1', 'cli_afkar', 'resolved', now()),
+  ('sla_2', 'ord_2', 'cli_afkar', 'at_risk', now()),
+  ('sla_3', 'ord_3', 'cli_afkar', 'normal', now())
+on conflict (id) do nothing;
+
+insert into public.order_timeline (id, order_id, client_id, event, details, event_time) values
+  ('tl_1', 'ord_1', 'cli_afkar', 'order.created', '{"total": 750}', now() - interval '3 days'),
+  ('tl_2', 'ord_1', 'cli_afkar', 'order.payment.updated', '{"method": "mada"}', now() - interval '3 days'),
+  ('tl_3', 'ord_1', 'cli_afkar', 'shipment.created', '{"company": "Aramex", "tracking": "ARX123456"}', now() - interval '2 days'),
+  ('tl_4', 'ord_1', 'cli_afkar', 'order.completed', null, now() - interval '2 days'),
+  ('tl_5', 'ord_2', 'cli_afkar', 'order.created', '{"total": 1299}', now() - interval '1 week'),
+  ('tl_6', 'ord_2', 'cli_afkar', 'shipment.created', '{"company": "SMSA", "tracking": "SMS789012"}', now() - interval '4 days')
+on conflict (id) do nothing;
+
+insert into public.abandoned_carts (id, client_id, salla_cart_id, customer_id, status, cart_total, items, created_at) values
+  ('cart_1', 'cli_afkar', 7001, 'cust_3', 'abandoned', 449, '[{"name":"Abstract Gold Canvas","qty":1}]', now() - interval '2 days'),
+  ('cart_2', 'cli_afkar', 7002, null, 'abandoned', 1299, '[{"name":"3D Wooden World Map","qty":1}]', now() - interval '1 day')
 on conflict (id) do nothing;
 
 -- Snapshot integrity: one value per KPI per day. Dedupe keeping the newest
