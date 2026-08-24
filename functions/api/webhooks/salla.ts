@@ -77,13 +77,19 @@ export async function onRequest(context: { request: Request; env: Record<string,
   const errors: string[] = []
 
   // Resolve the client_id for this merchant via integration_tokens —
-  // pattern-independent (works whether the row id is cli_salla_X or cli_salla_store_X).
+  // pattern-independent (raw id, store_-prefixed, or embedded in client id).
   async function resolveClientId(): Promise<string | null> {
     try {
-      const res = await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?platform=eq.salla&store_id=eq.${body.merchant}&select=client_id`, { headers: GET })
+      const res = await fetch(`${env.SUPABASE_URL}/rest/v1/integration_tokens?platform=eq.salla&select=client_id,store_id`, { headers: GET })
       if (res.ok) {
-        const rows = (await res.json()) as Array<{ client_id?: string }>
-        if (rows[0]?.client_id) return rows[0].client_id
+        const rows = (await res.json()) as Array<{ client_id?: string; store_id?: string | null }>
+        const m = String(body.merchant)
+        const hit = rows.find((r) =>
+          r.store_id === m ||
+          r.store_id === `store_${m}` ||
+          String(r.client_id ?? "").endsWith(m),
+        )
+        if (hit?.client_id) return hit.client_id
       }
     } catch { /* fallthrough */ }
     return null
