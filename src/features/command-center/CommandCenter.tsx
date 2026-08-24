@@ -41,6 +41,7 @@ import {
   kpiSeriesFor,
 } from '../../lib/insights'
 import { SectionTitle } from '../../components/shared/ui'
+import { StorePulse } from '../pulse/StorePulse'
 import { formatFull } from '../../lib/date'
 import type { DataSourceId } from '../../types/database'
 
@@ -468,6 +469,12 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Store Pulse — live heartbeat of the store */}
+        <section className="lg:col-span-1 order-first lg:order-none">
+          <SectionTitle>Store Pulse</SectionTitle>
+          <StorePulse enabled={true} />
+        </section>
+
         {/* Needs Attention */}
         <section className="lg:col-span-2">
           <SectionTitle>Needs Attention</SectionTitle>

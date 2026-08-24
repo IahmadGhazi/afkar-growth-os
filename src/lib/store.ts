@@ -83,6 +83,7 @@ let state: AppState = emptyState()
 let bootstrapped = false
 let refreshing = false
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
+let pollTimer: ReturnType<typeof setInterval> | null = null
 const listeners = new Set<Listener>()
 
 function notify() {
@@ -1309,4 +1310,21 @@ function startLiveSync() {
     )
   }
   liveChannel.subscribe()
+
+  // ── Safety-net poll: refresh store data every 25s while the tab is visible.
+  // Realtime handles instant push once the publication is enabled; this
+  // guarantees freshness (webhook → DB → UI) even if realtime is blocked.
+  // Pauses after 20 min of no interaction to save quota.
+  let lastActivity = Date.now()
+  const bump = () => { lastActivity = Date.now() }
+  window.addEventListener('keydown', bump, { passive: true })
+  window.addEventListener('pointerdown', bump, { passive: true })
+  window.addEventListener('wheel', bump, { passive: true })
+  if (!pollTimer) {
+    pollTimer = setInterval(() => {
+      if (document.hidden) return
+      if (Date.now() - lastActivity > 20 * 60_000) return
+      void refreshFromServer()
+    }, 25_000)
+  }
 }
