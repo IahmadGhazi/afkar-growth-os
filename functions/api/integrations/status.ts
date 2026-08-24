@@ -3,7 +3,7 @@
  * Ghazi pattern: booleans + non-secret labels only; secrets never leave the
  * server. Staff gate: admin / account_manager / media_buyer.
  */
-type Platform = "google_ads" | "tiktok_ads" | "snap_ads" | "salla"
+type Platform = "google_ads" | "tiktok_ads" | "snap_ads" | "salla" | "meta"
 
 const CREDENTIALS: Record<Platform, { secret: string[]; account?: string }> = {
   google_ads: {
@@ -21,6 +21,10 @@ const CREDENTIALS: Record<Platform, { secret: string[]; account?: string }> = {
   salla: {
     secret: ["SALLA_CLIENT_ID", "SALLA_CLIENT_SECRET", "SALLA_REFRESH_TOKEN"],
     account: "SALLA_STORE_ID",
+  },
+  meta: {
+    secret: ["META_ACCESS_TOKEN"],
+    account: "META_AD_ACCOUNT_ID",
   },
 }
 

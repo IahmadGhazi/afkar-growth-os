@@ -13,6 +13,7 @@ const LABELS: Record<string, string> = {
   tiktok_ads: 'TikTok Ads',
   snap_ads: 'Snapchat Ads',
   salla: 'Salla Store',
+  meta: 'Meta (Facebook/Instagram)',
 }
 
 export function IntegrationsPanel() {

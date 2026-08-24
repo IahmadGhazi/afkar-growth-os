@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { currentClient, kpisForClient, getConnection } from '../../lib/selectors'
-import { SOURCES, sourceInfo, parseMetricCsv } from '../../lib/integrations'
+import { sourceInfo, parseMetricCsv } from '../../lib/integrations'
 import {
   parseWorkbook,
   parseSheetsText,
@@ -25,92 +25,6 @@ import {
 import { SectionTitle } from '../../components/shared/ui'
 import { formatShort } from '../../lib/date'
 import { IntegrationsPanel } from './IntegrationsPanel'
-import type { DataSourceId } from '../../types/database'
-
-function ConnectionCard({ sourceId }: { sourceId: DataSourceId }) {
-  const { state, actions } = useApp()
-  const info = sourceInfo(sourceId)
-  const connection = getConnection(state, sourceId)
-  const clientId = state.currentClientId
-  const [showSetup, setShowSetup] = useState(false)
-  if (!info) return null
-
-  return (
-    <div className="glass-card hover-lift p-5">
-      <div className="flex items-center justify-between mb-2">
-        <div className="font-semibold text-[var(--text-primary)]">{info.name}</div>
-        <span
-          className={`badge ${
-            connection?.connected
-              ? 'bg-[var(--positive-soft)] text-[var(--positive)]'
-              : 'bg-[var(--track)] text-[var(--text-muted)]'
-          }`}
-        >
-          {connection?.connected ? 'Connected' : 'Not connected'}
-        </span>
-      </div>
-      <div className="text-sm text-[var(--text-muted)] mb-3">{info.description}</div>
-
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-xs text-[var(--text-muted)]">
-          {connection?.last_sync_at
-            ? `Last sync ${formatShort(connection.last_sync_at)}`
-            : 'Never synced'}
-        </div>
-        {connection?.sync_error && (
-          <div className="text-xs text-[var(--critical)] flex items-center gap-1">
-            <XCircle size={12} /> {connection.sync_error}
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        {connection?.connected ? (
-          <>
-            <button
-              onClick={() => actions.syncSource(sourceId)}
-              className="btn btn-primary"
-            >
-              <RefreshCw size={14} /> Sync now
-            </button>
-            <button
-              onClick={() => actions.disconnectSource(sourceId)}
-              className="btn btn-outline"
-            >
-              <Link2Off size={14} /> Disconnect
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={() => actions.connectSource(sourceId, clientId)}
-              className="btn btn-primary"
-            >
-              <Link2 size={14} /> Connect
-            </button>
-            <button
-              onClick={() => setShowSetup(!showSetup)}
-              className="btn btn-outline"
-            >
-              Setup steps
-            </button>
-          </>
-        )}
-      </div>
-
-      {showSetup && (
-        <ol className="glass-inset mt-4 p-4 space-y-2 text-sm text-[var(--text-secondary)]">
-          {info.setup.map((step, index) => (
-            <li key={index} className="flex gap-2">
-              <span className="text-[var(--brand)] font-semibold">{index + 1}.</span>
-              {step}
-            </li>
-          ))}
-        </ol>
-      )}
-    </div>
-  )
-}
 
 function ManualEntry() {
   const { state, actions } = useApp()
@@ -427,34 +341,18 @@ function SheetSources() {
 export function Data() {
   const { state } = useApp()
   const client = currentClient(state)
-  const apiSources = SOURCES.filter((source) => source.id !== 'manual' && source.id !== 'excel' && source.id !== 'google_sheets')
-  const connectedCount = apiSources.filter((source) => getConnection(state, source.id)?.connected).length
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
         <Zap size={14} />
-        <span>{client?.name ?? 'Client'} · {connectedCount}/{apiSources.length} API sources connected</span>
+        <span>{client?.name ?? 'Client'}</span>
       </div>
 
-      {/* Live platform integrations */}
+      {/* Live platform integrations — THE ONLY connection interface */}
       <section>
         <SectionTitle>Platform Integrations</SectionTitle>
         <IntegrationsPanel />
-      </section>
-
-      {/* Manual connections (demo mode) */}
-      <section>
-        <SectionTitle>Data Sources</SectionTitle>
-        <div className="text-sm text-[var(--text-muted)] mb-4">
-          Connect Salla, Google Ads, TikTok and Snapchat to auto-fetch numbers. Until API keys are added,
-          Connect runs in demo mode and Sync records the metrics each source can provide.
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {apiSources.map((source) => (
-            <ConnectionCard key={source.id} sourceId={source.id} />
-          ))}
-        </div>
       </section>
 
       {/* Excel & Google Sheets */}
