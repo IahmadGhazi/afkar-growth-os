@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Star, MessageSquare, X } from 'lucide-react'
 import { useApp } from '../../lib/store'
+import { scopeSalla } from '../../lib/selectors'
 import { EmptyState } from '../../components/shared/ui'
 import { LiveBadge } from '../../components/shared/LiveBadge'
 
@@ -9,8 +10,8 @@ export function Reviews() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [starFilter, setStarFilter] = useState(0)
   const reviews = useMemo(
-    () => (state.sallaReviews ?? []).filter((r) => !state.currentClientId || r.client_id === state.currentClientId),
-    [state.sallaReviews, state.currentClientId],
+    () => scopeSalla(state, state.sallaReviews),
+    [state.sallaReviews, state.clients],
   )
 
   const filtered = useMemo(() => {

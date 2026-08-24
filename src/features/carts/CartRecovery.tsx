@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Search, ShoppingCart, Copy, Check, ExternalLink, MessageCircle, Phone, Flame, Clock, Snowflake, Trophy, RefreshCw } from 'lucide-react'
 import { useApp } from '../../lib/store'
+import { scopeSalla } from '../../lib/selectors'
 import { EmptyState } from '../../components/shared/ui'
 import { LiveBadge } from '../../components/shared/LiveBadge'
 import { toast } from '../../lib/toast'
@@ -34,8 +35,8 @@ export function CartRecovery() {
   const [search, setSearch] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
   const allCarts = useMemo(
-    () => (state.abandonedCarts ?? []).filter((c) => !state.currentClientId || c.client_id === state.currentClientId),
-    [state.abandonedCarts, state.currentClientId],
+    () => scopeSalla(state, state.abandonedCarts),
+    [state.abandonedCarts, state.clients],
   )
 
   // Active carts only (purchased ones converted)

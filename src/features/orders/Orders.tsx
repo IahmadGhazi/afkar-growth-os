@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Search, ShoppingBag, Clock, User, CreditCard, Layers, Truck, ShieldAlert } from 'lucide-react'
 import { useApp } from '../../lib/store'
+import { scopeSalla } from '../../lib/selectors'
 import { EmptyState } from '../../components/shared/ui'
 import { LiveBadge } from '../../components/shared/LiveBadge'
 import { orderStatusMeta, exactDateTime, relativeFromIso, STATUS_ORDER } from '../../lib/orderStatus'
@@ -19,13 +20,12 @@ export function Orders() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerIntel | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<SallaOrder | null>(null)
   const cid = state.currentClientId
-  const scoped = <T extends { client_id: string }>(rows: T[] | null | undefined): T[] =>
-    (rows ?? []).filter((r) => !cid || r.client_id === cid)
-  const orders = useMemo(() => scoped(state.sallaOrders), [state.sallaOrders, cid])
-  const customers = useMemo(() => scoped(state.sallaCustomers), [state.sallaCustomers, cid])
-  const timeline = useMemo(() => scoped(state.orderTimeline), [state.orderTimeline, cid])
-  const shipments = useMemo(() => scoped(state.shipments), [state.shipments, cid])
-  const slas = useMemo(() => scoped(state.orderSlas), [state.orderSlas, cid])
+  void cid
+  const orders = useMemo(() => scopeSalla(state, state.sallaOrders), [state.sallaOrders, state.clients])
+  const customers = useMemo(() => scopeSalla(state, state.sallaCustomers), [state.sallaCustomers, state.clients])
+  const timeline = useMemo(() => scopeSalla(state, state.orderTimeline), [state.orderTimeline, state.clients])
+  const shipments = useMemo(() => scopeSalla(state, state.shipments), [state.shipments, state.clients])
+  const slas = useMemo(() => scopeSalla(state, state.orderSlas), [state.orderSlas, state.clients])
 
   // ── Delivery health (from real shipment data)
   const PROBLEM_SHIP = new Set(['cancelled', 'lost', 'damaged', 'return_to_origin', 'return_in_progress', 'unable_to_deliver'])

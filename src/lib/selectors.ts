@@ -18,7 +18,22 @@ export const DONE_STATUSES: TaskStatus[] = ['done', 'approved']
 export const ACTIVE_STATUSES: TaskStatus[] = ['backlog', 'planned', 'in_progress', 'review', 'blocked']
 
 export function currentClient(state: AppState): Client | null {
-  return state.clients.find((client) => client.id === state.currentClientId) ?? null
+  return state.clients.find((c) => c.id === state.currentClientId) ?? state.clients[0] ?? null
+}
+
+/** IDs of every connected Salla store client. Store-data pages scope to
+ *  these (NOT to the ops client, which owns tasks/KPIs/campaigns). */
+export function sallaClientIds(state: AppState): Set<string> {
+  return new Set(state.clients.filter((c) => c.id.startsWith('cli_salla')).map((c) => c.id))
+}
+
+/** Filter helper: keep rows belonging to a connected Salla store.
+ *  When no store clients exist yet, pass everything through. */
+export function scopeSalla<T extends { client_id: string }>(state: AppState, rows: T[] | null | undefined): T[] {
+  const ids = sallaClientIds(state)
+  const list = rows ?? []
+  if (ids.size === 0) return list
+  return list.filter((r) => ids.has(r.client_id))
 }
 
 export function currentUser(state: AppState): Profile | null {

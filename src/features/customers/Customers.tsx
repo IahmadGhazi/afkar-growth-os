@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Search, Users, Mail, Phone, MapPin, Crown } from 'lucide-react'
 import { useApp } from '../../lib/store'
+import { scopeSalla } from '../../lib/selectors'
 import { EmptyState } from '../../components/shared/ui'
 import { computeCustomerIntel, SEGMENTS, type CustomerIntel, type SegmentId } from '../../lib/rfm'
 import { CustomerDrawer } from './CustomerDrawer'
@@ -12,12 +13,12 @@ export function Customers() {
   const [segment, setSegment] = useState<SegmentId | null>(null)
   const [selected, setSelected] = useState<CustomerIntel | null>(null)
   const customers = useMemo(
-    () => (state.sallaCustomers ?? []).filter((c) => !state.currentClientId || c.client_id === state.currentClientId),
-    [state.sallaCustomers, state.currentClientId],
+    () => scopeSalla(state, state.sallaCustomers),
+    [state.sallaCustomers, state.clients],
   )
   const orders = useMemo(
-    () => (state.sallaOrders ?? []).filter((o) => !state.currentClientId || o.client_id === state.currentClientId),
-    [state.sallaOrders, state.currentClientId],
+    () => scopeSalla(state, state.sallaOrders),
+    [state.sallaOrders, state.clients],
   )
 
   const intel = useMemo(() => computeCustomerIntel(customers, orders), [customers, orders])

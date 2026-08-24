@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Search, Package, PackageX, Star, AlertTriangle } from 'lucide-react'
 import { useApp } from '../../lib/store'
+import { scopeSalla } from '../../lib/selectors'
 import { EmptyState } from '../../components/shared/ui'
 import { LiveBadge } from '../../components/shared/LiveBadge'
 
@@ -8,8 +9,8 @@ export function StoreProducts() {
   const { state } = useApp()
   const [search, setSearch] = useState('')
   const products = useMemo(
-    () => (state.sallaProducts ?? []).filter((p) => !state.currentClientId || p.client_id === state.currentClientId),
-    [state.sallaProducts, state.currentClientId],
+    () => scopeSalla(state, state.sallaProducts),
+    [state.sallaProducts, state.clients],
   )
 
   const filtered = useMemo(() => {
