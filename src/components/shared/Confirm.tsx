@@ -39,8 +39,8 @@ export function AppConfirm() {
   if (!s) return null
   const close = (v: boolean) => { s.resolve(v); state = null; emit() }
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="alertdialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px] animate-[fadeIn_.15s_ease]" onClick={() => close(false)} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="alertdialog" aria-modal="true">
+      <div className="absolute inset-0 bg-black/45 animate-[fadeIn_.15s_ease]" onClick={() => close(false)} />
       <div className="relative glass-card p-6 w-full max-w-sm space-y-4 animate-[pulseIn_.25s_var(--ease-spring)_both]">
         <div className="flex items-start gap-3">
           <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"

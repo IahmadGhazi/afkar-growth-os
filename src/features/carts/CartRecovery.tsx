@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, ShoppingCart, Copy, Check, ExternalLink, MessageCircle, Phone, Flame, Clock, Snowflake, Trophy, RefreshCw, TicketPercent, Brain, X } from 'lucide-react'
+import { Search, ShoppingCart, Copy, Check, ExternalLink, MessageCircle, Phone, Flame, Clock, Snowflake, Trophy, TicketPercent, Brain, X, RefreshCw } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { scopeSalla } from '../../lib/selectors'
 import { EmptyState } from '../../components/shared/ui'
@@ -24,20 +24,14 @@ function tempOf(cart: AbandonedCart): Temp {
 }
 
 const TEMP_META: Record<Temp, { label: string; color: string; icon: typeof Flame }> = {
-  hot: { label: 'Hot — act now', color: '#ef4444', icon: Flame },
-  warm: { label: 'Warm today', color: '#f59e0b', icon: Clock },
-  cold: { label: 'Cooling off', color: '#64748b', icon: Snowflake },
+  hot: { label: 'Hot', color: '#ef4444', icon: Flame },
+  warm: { label: 'Warm', color: '#f59e0b', icon: Clock },
+  cold: { label: 'Cooling', color: '#64748b', icon: Snowflake },
 }
 
 /**
- * Recovery message — Saudi dialect, built on proven persuasion psychology:
- *  1. Personal warmth (حياك الله) → belonging, not a robot
- *  2. Ownership framing ("سلتك انتظرتك") → endowment: it's already theirs
- *  3. Concrete item list + price → re-anchors the value they chose
- *  4. Scarcity ("الكمية محدودة") → loss aversion kicks in
- *  5. Exclusive gift framing for the coupon (not "discount", but a GIFT) → reciprocity
- *  6. Urgency with reason (ساري لفترة محدودة) → deadline without pressure
- *  7. ONE tiny action ("بضغطة واحدة") → zero friction CTA
+ * Recovery message — Saudi dialect, persuasion stack:
+ * warmth → ownership → value re-anchor → gift framing → honest urgency → one CTA.
  */
 function recoveryMessage(cart: AbandonedCart): string {
   const name = (cart.customer_name ?? '').split(' ')[0] || 'أبو فلان'
@@ -105,6 +99,7 @@ export function CartRecovery() {
     () => allCarts.filter((c) => c.status !== 'purchased'),
     [allCarts],
   )
+  const rescuedCount = allCarts.filter((c) => c.status === 'purchased').length
 
   const filtered = useMemo(() => {
     let list = carts
@@ -123,9 +118,6 @@ export function CartRecovery() {
   const hotCarts = carts.filter((c) => tempOf(c) === 'hot')
   const contactedIds = new Set(carts.filter((c) => c.last_contacted_at).map((c) => c.id))
 
-  // Optimistic coupon codes minted this session (server truth arrives via refresh)
-  const [minting, setMinting] = useState<Set<string>>(new Set())
-  const [freshCodes, setFreshCodes] = useState<Map<string, string>>(new Map())
   // Coupon strength — YOU decide; the Brain advises per-row
   const [percent, setPercent] = useState(10)
   const [validHours, setValidHours] = useState(48)
@@ -133,8 +125,17 @@ export function CartRecovery() {
   const [customHrs, setCustomHrs] = useState<string>('')
   const [rowOverrides, setRowOverrides] = useState<Map<string, { percent: number; hours: number }>>(new Map())
   const [allCoupons, setAllCoupons] = useState<Array<{ id: number; code: string; amount: number | null; name?: string | null; status: string; expiryDate?: string | null; isGroup?: boolean }>>([])
-  const [activeCoupons, setActiveCoupons] = useState<Array<{ id: number; code: string; amount: number | null; name?: string | null; expiryDate?: string | null; usage?: { times: number | null } }>>([])
+  const [activeCoupons, setActiveCoupons] = useState<Array<{ id: number; code: string; amount: number | null; name?: string | null; expiryDate?: string | null }>>([])
+  const [minting, setMinting] = useState<Set<string>>(new Set())
+  const [freshCodes, setFreshCodes] = useState<Map<string, string>>(new Map())
   const codeFor = (c: AbandonedCart): string | null => c.coupon_code ?? freshCodes.get(c.id) ?? null
+
+  const intel = useMemo(() => computeCustomerIntel(state.sallaCustomers ?? [], state.sallaOrders ?? []), [state.sallaCustomers, state.sallaOrders])
+  const intelByCustomer = useMemo(() => {
+    const m = new Map<string, { segment: string; lifetimeValue: number; orderCount: number }>()
+    for (const i of intel) m.set(i.customer.id, { segment: i.segment, lifetimeValue: i.lifetimeValue, orderCount: i.orderCount })
+    return m
+  }, [intel])
 
   /** Status of an armed code: live / expired / unknown (paused or deleted) */
   const codeHealth = (code: string | null): 'live' | 'expired' | 'unknown' | 'none' => {
@@ -146,31 +147,7 @@ export function CartRecovery() {
     return 'live'
   }
 
-  const detachCoupon = async (cart: AbandonedCart) => {
-    const code = codeFor(cart)
-    if (!code) return
-    const ok = await confirm({
-      title: `Remove ${code}?`,
-      message: `Detaches from ${cart.customer_name ?? 'this cart'}.\nThe coupon stays alive in your store (Products → Coupons) — the cart just becomes coupon-free again.`,
-      confirmLabel: 'Detach', danger: false,
-    })
-    if (!ok) return
-    if (!supabase) return
-    const res = await supabase.from('abandoned_carts').update({ coupon_code: null }).eq('id', cart.id)
-    if (res.error) { toast.error(`Detach failed: ${res.error.message}`); return }
-    setFreshCodes((prev) => { const n = new Map(prev); n.delete(cart.id); return n })
-    toast.success(`${code} detached — cart is coupon-free again`)
-    void refreshFromServer()
-  }
-
-  const intel = useMemo(() => computeCustomerIntel(state.sallaCustomers ?? [], state.sallaOrders ?? []), [state.sallaCustomers, state.sallaOrders])
-  const intelByCustomer = useMemo(() => {
-    const m = new Map<string, { segment: string; lifetimeValue: number; orderCount: number }>()
-    for (const i of intel) m.set(i.customer.id, { segment: i.segment, lifetimeValue: i.lifetimeValue, orderCount: i.orderCount })
-    return m
-  }, [intel])
-
-  // Load ACTIVE coupons once for the attach-existing picker
+  // Load coupon universe once — powers health badges + attach picker
   useEffect(() => {
     void (async () => {
       try {
@@ -180,30 +157,54 @@ export function CartRecovery() {
         const res = await fetch('/api/salla/coupons', { headers: { Authorization: `Bearer ${data.session.access_token}` } })
         const body = await res.json()
         if (res.ok && body.ok) {
-          const all = body.coupons as Array<{ id: number; code: string; amount: number | null; name?: string | null; status: string; expiryDate: string | null; isGroup: boolean; usage?: { times: number | null } }>
+          const all = body.coupons as Array<{ id: number; code: string; amount: number | null; name?: string | null; status: string; expiryDate: string | null; isGroup: boolean }>
           setAllCoupons(all)
           setActiveCoupons(all
             .filter((c) => c.status === 'active' && !c.isGroup && (!c.expiryDate || new Date(c.expiryDate.replace(' ', 'T')).getTime() > Date.now()))
-            .map((c) => ({ id: c.id, code: c.code, amount: c.amount, name: c.name, expiryDate: c.expiryDate, usage: c.usage })))
+            .map((c) => ({ id: c.id, code: c.code, amount: c.amount, name: c.name, expiryDate: c.expiryDate })))
         }
-      } catch { /* picker is optional */ }
+      } catch { /* optional */ }
     })()
   }, [])
+
+  const onMint = async (cart: AbandonedCart) => {
+    if (!supabase) { toast.error('Backend not configured'); return }
+    setMinting((prev) => new Set(prev).add(cart.id))
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) { toast.error('Sign in required'); return }
+      const result = await mintCoupon(cart, token, rowOverrides.get(cart.id)?.percent ?? percent, rowOverrides.get(cart.id)?.hours ?? validHours)
+      if (result.ok && result.code) {
+        setFreshCodes((prev) => new Map(prev).set(cart.id, result.code!))
+        if (result.cartUpdated === false) {
+          toast.error(`Coupon ${result.code} created but couldn't attach to this cart — see Coupons tab in Products`)
+        } else {
+          toast.success(`Coupon ${result.code} is live — ${rowOverrides.get(cart.id)?.percent ?? percent}% for ${rowOverrides.get(cart.id)?.hours ?? validHours}h`)
+        }
+        void refreshFromServer()
+      } else {
+        toast.error(`Coupon failed: ${result.error}`)
+      }
+    } finally {
+      setMinting((prev) => { const n = new Set(prev); n.delete(cart.id); return n })
+    }
+  }
 
   const attachExisting = async (cart: AbandonedCart, code: string) => {
     if (!supabase) return
     const res = await supabase.from('abandoned_carts').update({ coupon_code: code }).eq('id', cart.id)
     if (res.error) { toast.error(`Attach failed: ${res.error.message}`); return }
     setFreshCodes((prev) => new Map(prev).set(cart.id, code))
-    toast.success(`${code} armed on this cart — WhatsApp/Copy now carry it`)
+    toast.success(`${code} armed — WhatsApp/Copy now carry it`)
     void refreshFromServer()
   }
 
-  // ── Picker modal state (rich cards + confirm step — no accidental applies)
+  // ── Picker modal (rich cards → select → confirm)
   const [pickerCart, setPickerCart] = useState<AbandonedCart | null>(null)
-  const [pickerSelected, setPickerSelected] = useState<{ id: number; code: string; amount: number | null; name?: string | null; expiryDate?: string | null; usage?: { times: number | null } } | null>(null)
+  const [pickerSelected, setPickerSelected] = useState<{ id: number; code: string; amount: number | null; name?: string | null } | null>(null)
 
-  // ── BATCH ARM: mint ONE group coupon (N unique codes) → arm every warm/hot cart
+  // ── BATCH ARM: one group coupon, N unique codes
   const [batching, setBatching] = useState(false)
   const armable = filtered.filter((c) => !codeFor(c) && c.customer_mobile)
   const batchArm = async () => {
@@ -212,7 +213,7 @@ export function CartRecovery() {
     const ok = await confirm({
       title: `Arm ${targets.length} carts?`,
       message: `Mints ONE group coupon with ${targets.length} unique ${percent}% codes (valid ${validHours >= 24 ? `${Math.round(validHours / 24)}d` : `${validHours}h`}) and attaches one code per cart.\nEach code is private + traceable — leak-proof bulk.`,
-      confirmLabel: 'Arm them', danger: false,
+      confirmLabel: 'Arm them',
     })
     if (!ok) return
     setBatching(true)
@@ -244,30 +245,6 @@ export function CartRecovery() {
     }
   }
 
-  const onMint = async (cart: AbandonedCart) => {
-    if (!supabase) { toast.error('Backend not configured'); return }
-    setMinting((prev) => new Set(prev).add(cart.id))
-    try {
-      const { data } = await supabase.auth.getSession()
-      const token = data.session?.access_token
-      if (!token) { toast.error('Sign in required'); return }
-      const result = await mintCoupon(cart, token, rowOverrides.get(cart.id)?.percent ?? percent, rowOverrides.get(cart.id)?.hours ?? validHours)
-      if (result.ok && result.code) {
-        setFreshCodes((prev) => new Map(prev).set(cart.id, result.code!))
-        if (result.cartUpdated === false) {
-          toast.error(`Coupon ${result.code} created but couldn't attach to this cart — see Coupons tab in Products`)
-        } else {
-          toast.success(`Coupon ${result.code} is live — ${rowOverrides.get(cart.id)?.percent ?? percent}% for ${rowOverrides.get(cart.id)?.hours ?? validHours}h`)
-        }
-        void refreshFromServer()
-      } else {
-        toast.error(`Coupon failed: ${result.error}`)
-      }
-    } finally {
-      setMinting((prev) => { const n = new Set(prev); n.delete(cart.id); return n })
-    }
-  }
-
   const copyMsg = async (cart: AbandonedCart, codeOverride?: string | null) => {
     try {
       const msg = recoveryMessage(codeOverride ? { ...cart, coupon_code: codeOverride } : cart)
@@ -289,24 +266,39 @@ export function CartRecovery() {
     window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener')
   }
 
+  const detachCoupon = async (cart: AbandonedCart) => {
+    const code = codeFor(cart)
+    if (!code) return
+    const ok = await confirm({
+      title: `Remove ${code}?`,
+      message: `Detaches from ${cart.customer_name ?? 'this cart'}.\nThe coupon stays alive in your store (Products → Coupons) — the cart just becomes coupon-free again.`,
+      confirmLabel: 'Detach',
+    })
+    if (!ok) return
+    if (!supabase) return
+    const res = await supabase.from('abandoned_carts').update({ coupon_code: null }).eq('id', cart.id)
+    if (res.error) { toast.error(`Detach failed: ${res.error.message}`); return }
+    setFreshCodes((prev) => { const n = new Map(prev); n.delete(cart.id); return n })
+    toast.success(`${code} detached — cart is coupon-free again`)
+    void refreshFromServer()
+  }
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Cart Recovery</h2>
-          <div className="text-sm text-[var(--text-muted)]">
-            {carts.length} live carts · {potentialValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} SAR on the table
-            · <span className="text-[var(--positive)] font-semibold">{allCarts.filter((c) => c.status === 'purchased').length} rescued</span> all-time 🏆
-          </div>
+      <div>
+        <h2 className="text-lg font-semibold text-[var(--text-primary)]">Cart Recovery</h2>
+        <div className="text-sm text-[var(--text-muted)]">
+          {carts.length} live carts · {potentialValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} SAR on the table
+          · <span className="text-[var(--positive)] font-medium">{rescuedCount} rescued</span> all-time
         </div>
       </div>
 
       <LiveBadge />
 
-      {/* Summary cards */}
+      {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger">
-        <div className="glass-card p-4 flex items-center gap-3" style={{ borderColor: 'rgba(239,68,68,.25)' }}>
-          <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(239,68,68,.12)' }}>
+        <div className="glass-card p-4 flex items-center gap-3">
+          <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(239,68,68,.1)' }}>
             <Flame size={18} style={{ color: '#ef4444' }} />
           </span>
           <div>
@@ -339,47 +331,44 @@ export function CartRecovery() {
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search customer, phone or product…" className="field !pl-9" />
       </div>
 
-      {/* Coupon strength toolbar — you decide the discount */}
-      <div className="glass-card px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-          <TicketPercent size={12} /> Coupon strength
-        </span>
-        {armable.length === 0 && carts.length > 0 && (
-          <span className="text-[11px] text-[var(--text-muted)]">
-            Every cart is armed — <b>click any coupon badge to swap it</b>, ✕ to detach.
-          </span>
-        )}
-        <div className="flex gap-1.5 items-center">
+      {/* Strength toolbar */}
+      <div className="glass-card px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Strength</span>
+        <div className="flex gap-1 items-center">
           {[5, 10, 15, 20, 25].map((p) => (
             <button key={p} onClick={() => { setPercent(p); setCustomPct('') }}
-              className={`chip !px-2.5 !py-1 text-xs ${percent === p && !customPct ? 'font-bold' : ''}`}
-              style={percent === p && !customPct ? { borderColor: '#d29a0c88', color: '#d29a0c', background: 'rgba(240,196,46,.12)' } : undefined}>
+              className={`chip !px-2.5 !py-1 text-xs ${percent === p && !customPct ? 'font-semibold' : ''}`}
+              style={percent === p && !customPct ? { borderColor: 'var(--brand)', color: 'var(--brand)' } : undefined}>
               {p}%
             </button>
           ))}
-          <input type="number" min={1} max={90} placeholder="custom %" value={customPct}
+          <input type="number" min={1} max={90} placeholder="%" value={customPct} aria-label="Custom discount percent"
             onChange={(e) => { const v = e.target.value; setCustomPct(v); if (v && Number(v) >= 1) setPercent(Math.min(90, Math.max(1, Number(v)))) }}
-            className="field !w-20 !py-1 !text-xs tabular-nums" title="Custom discount %" />
+            className="field !w-16 !py-1 !text-xs tabular-nums" />
         </div>
-        <div className="flex gap-1.5 items-center">
-          {[[24, '1 day'], [48, '2 days'], [168, '1 week']].map(([h, label]) => (
+        <div className="flex gap-1 items-center">
+          {[[24, '1d'], [48, '2d'], [168, '1w']].map(([h, label]) => (
             <button key={h} onClick={() => { setValidHours(h as number); setCustomHrs('') }}
-              className={`chip !px-2.5 !py-1 text-xs ${validHours === h ? 'font-bold' : ''}`}
-              style={validHours === h ? { borderColor: '#d29a0c88', color: '#d29a0c', background: 'rgba(240,196,46,.12)' } : undefined}>
+              className={`chip !px-2.5 !py-1 text-xs ${validHours === h && !customHrs ? 'font-semibold' : ''}`}
+              style={validHours === h && !customHrs ? { borderColor: 'var(--brand)', color: 'var(--brand)' } : undefined}>
               {label as string}
             </button>
           ))}
-          <input type="number" min={1} max={2160} placeholder="custom h" value={customHrs}
+          <input type="number" min={1} max={2160} placeholder="hrs" value={customHrs} aria-label="Custom validity hours"
             onChange={(e) => { const v = e.target.value; setCustomHrs(v); if (v && Number(v) >= 1) setValidHours(Math.min(2160, Number(v))) }}
-            className="field !w-20 !py-1 !text-xs tabular-nums" title="Custom hours" />
+            className="field !w-16 !py-1 !text-xs tabular-nums" />
         </div>
         {armable.length > 1 && (
           <button onClick={() => void batchArm()} disabled={batching}
-            title={`Mint ONE group coupon with ${Math.min(armable.length, 50)} unique ${percent}% codes and arm every warm cart — leak-proof bulk`}
-            className="btn !text-[11px] !px-2.5 !py-1 inline-flex items-center gap-1 ml-auto"
-            style={{ background: 'rgba(139,92,246,.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,.3)' }}>
-            ⚡ {batching ? 'Arming…' : `Arm all ${Math.min(armable.length, 50)}`}
+            title={`Mint ONE group coupon with ${Math.min(armable.length, 50)} unique ${percent}% codes and arm every warm cart`}
+            className="btn btn-outline !text-xs !px-3 !py-1.5 ml-auto inline-flex items-center gap-1.5">
+            {batching ? 'Arming…' : `Arm all ${Math.min(armable.length, 50)}`}
           </button>
+        )}
+        {armable.length === 0 && carts.length > 0 && (
+          <span className="text-[11px] text-[var(--text-muted)] ml-auto">
+            All carts armed — click a coupon code to swap it, ✕ to detach
+          </span>
         )}
       </div>
 
@@ -394,58 +383,54 @@ export function CartRecovery() {
           {filtered.map((cart) => {
             const temp = tempOf(cart)
             const meta = TEMP_META[temp]
-            const Icon = meta.icon
+            const TempIcon = meta.icon
             const contacted = Boolean(cart.last_contacted_at)
             const override = rowOverrides.get(cart.id)
             const brain = recommendCoupon(cart, cart.customer_id ? intelByCustomer.get(cart.customer_id) ?? null : null)
             const effPercent = override?.percent ?? percent
             const effHours = override?.hours ?? validHours
             const brainMatches = brain.percent === effPercent && brain.hours === effHours
+            const armedCode = codeFor(cart)
+            const health = codeHealth(armedCode)
             return (
-              <div key={cart.id} className="glass-card relative overflow-hidden hover-lift px-4 sm:px-5 py-3.5"
-                style={temp === 'hot' ? { borderColor: 'rgba(239,68,68,.35)' } : undefined}>
+              <div key={cart.id} className="glass-card relative overflow-hidden px-4 sm:px-5 py-3.5">
                 <span aria-hidden className="absolute inset-y-0 left-0 w-[3px]" style={{ background: meta.color }} />
+
                 <div className="flex flex-wrap md:flex-nowrap items-start gap-x-4 gap-y-2">
-                  <div className="min-w-[130px]">
-                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide"
-                      style={{ color: meta.color, background: `${meta.color}1a`, border: `1px solid ${meta.color}40` }}>
-                      <Icon size={10} /> {meta.label.split('—')[0]}
+                  {/* Temp */}
+                  <div className="min-w-[86px]">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: meta.color }}>
+                      <TempIcon size={11} /> {meta.label}
                     </span>
-                    <div className="text-[11px] text-[var(--text-muted)] mt-1">
-                      {cart.age_minutes != null ? `${cart.age_minutes < 60 ? `${cart.age_minutes}m` : `${Math.floor(cart.age_minutes / 60)}h`} ago` : ''}
+                    <div className="text-[11px] text-[var(--text-muted)] mt-0.5 tabular-nums">
+                      {cart.age_minutes != null && cart.age_minutes < 60
+                        ? `${cart.age_minutes}m`
+                        : cart.age_minutes != null ? `${Math.floor(cart.age_minutes / 60)}h` : ''}
                     </div>
                   </div>
 
+                  {/* Who + what */}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-semibold text-[var(--text-primary)] truncate" dir="auto">{cart.customer_name ?? 'Guest'}</span>
-                      {contacted && (
-                        <span className="badge bg-[var(--positive-soft)] text-[var(--positive)] text-[9px]"><Check size={9} /> contacted</span>
+                      {contacted && <span className="text-[10px] text-[var(--positive)]">✓ contacted</span>}
+                      {armedCode && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <button onClick={() => { setPickerCart(cart); setPickerSelected(null) }}
+                            className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold px-1.5 py-0.5 rounded border transition-colors hover:bg-[var(--hover)]"
+                            title="Click to swap this coupon"
+                            style={{
+                              borderColor: health === 'live' ? 'rgba(16,185,129,.35)' : 'rgba(239,68,68,.4)',
+                              color: health === 'live' ? '#10b981' : '#ef4444',
+                            }}>
+                            <TicketPercent size={10} /> {armedCode}{health !== 'live' && <span className="font-sans">· {health === 'expired' ? 'dead' : 'gone'}</span>}
+                          </button>
+                          <button onClick={() => void detachCoupon(cart)} aria-label={`Remove ${armedCode} from this cart`}
+                            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover)] transition-colors">
+                            <X size={12} />
+                          </button>
+                        </span>
                       )}
-                      {codeFor(cart) && (() => {
-                        const health = codeHealth(codeFor(cart))
-                        const style = health === 'live'
-                          ? { background: 'rgba(37,211,102,.12)', color: '#25D366', border: '1px solid rgba(37,211,102,.3)' }
-                          : health === 'expired'
-                            ? { background: 'rgba(239,68,68,.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,.3)' }
-                            : { background: 'rgba(245,158,11,.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,.3)' }
-                        return (
-                          <span className="badge text-[9px] font-mono inline-flex items-center gap-1" style={style}
-                            title={health === 'expired' ? 'This coupon expired or was paused — click to swap, or X to detach' : health === 'unknown' ? 'Coupon not found in store (deleted?) — click to swap a fresh one' : 'Live coupon — click to swap it for another'}>
-                            <button onClick={(e) => { e.stopPropagation(); setPickerCart(cart); setPickerSelected(null) }}
-                              className="inline-flex items-center gap-1 hover:underline" style={{ color: 'inherit' }}
-                              title="Click to swap this coupon">
-                              <TicketPercent size={9} /> {codeFor(cart)}
-                              {health !== 'live' && <span className="font-sans font-semibold">{health === 'expired' ? 'dead' : '??'}</span>}
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); void detachCoupon(cart) }}
-                              className="opacity-60 hover:opacity-100 ml-0.5" title="Remove coupon from this cart"
-                              style={{ color: 'inherit' }}>
-                              <X size={10} />
-                            </button>
-                          </span>
-                        )
-                      })()}
                     </div>
                     <div className="text-xs text-[var(--text-muted)] truncate mt-0.5" dir="auto">
                       {Array.isArray(cart.items) && cart.items.length > 0
@@ -458,62 +443,57 @@ export function CartRecovery() {
                         {cart.customer_email && <span className="truncate">{cart.customer_email}</span>}
                       </div>
                     )}
-                    {/* 🤖 THE KNOWLEDGE BOT — prescribed dose for THIS cart */}
-                    {!codeFor(cart) && (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-md"
-                          style={{ background: 'rgba(139,92,246,.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,.3)' }}
-                          title={brain.reasons.join(' · ')}>
-                          <Brain size={10} /> Brain says {brain.percent}% · {brain.hours >= 24 ? `${Math.round(brain.hours / 24)}d` : `${brain.hours}h`}
-                          <span className="opacity-60">({brain.confidence})</span>
+                    {/* Brain — quiet advice, gold apply */}
+                    {!armedCode && (
+                      <div className="mt-1 text-[11px] text-[var(--text-muted)] flex items-center gap-2">
+                        <Brain size={11} className="shrink-0" />
+                        <span>
+                          suggests <span className="font-semibold text-[var(--text-primary)]">{brain.percent}% · {brain.hours >= 24 ? `${Math.round(brain.hours / 24)}d` : `${brain.hours}h`}</span>
+                          {!brainMatches && (
+                            <button onClick={() => setRowOverrides((prev) => new Map(prev).set(cart.id, { percent: brain.percent, hours: brain.hours }))}
+                              className="ml-1.5 font-medium hover:underline" style={{ color: 'var(--brand)' }}>apply</button>
+                          )}
+                          {override && (
+                            <button onClick={() => setRowOverrides((prev) => { const n = new Map(prev); n.delete(cart.id); return n })}
+                              className="ml-1.5 hover:underline">reset</button>
+                          )}
+                          <span className="opacity-60 ml-1" title={brain.reasons.join(' · ')}>— {brain.reasons[0]}</span>
                         </span>
-                        {!brainMatches && (
-                          <button onClick={() => setRowOverrides((prev) => new Map(prev).set(cart.id, { percent: brain.percent, hours: brain.hours }))}
-                            className="text-[10px] font-semibold hover:underline" style={{ color: '#8b5cf6' }}>
-                            Apply
-                          </button>
-                        )}
-                        {override && (
-                          <button onClick={() => setRowOverrides((prev) => { const n = new Map(prev); n.delete(cart.id); return n })}
-                            className="text-[10px] text-[var(--text-muted)] hover:underline">reset to {percent}%</button>
-                        )}
                       </div>
                     )}
                   </div>
 
+                  {/* Money + actions */}
                   <div className="flex items-center gap-2 ml-auto shrink-0">
                     <span className="text-base font-bold text-[var(--text-primary)] tabular-nums mr-1">
                       {Math.round(cart.cart_total).toLocaleString()} <span className="text-xs font-medium opacity-60">SAR</span>
                     </span>
-                    {!codeFor(cart) && (
+                    {!armedCode && (
                       <button onClick={() => onMint(cart)} disabled={minting.has(cart.id)}
-                        title={`Mint a ${effPercent}% / ${effHours >= 24 ? `${Math.round(effHours / 24)}d` : `${effHours}h`} coupon in your Salla store and attach it`}
-                        className="btn !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5" style={{ background: 'rgba(240,196,46,.12)', color: '#d29a0c', border: '1px solid rgba(210,154,12,.3)' }}>
-                        <TicketPercent size={13} /> {minting.has(cart.id) ? 'Minting…' : `${effPercent}%`}
+                        title={`Mint a ${effPercent}% / ${effHours >= 24 ? `${Math.round(effHours / 24)}d` : `${effHours}h`} coupon and attach it`}
+                        className="btn btn-outline !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5">
+                        <TicketPercent size={13} /> {minting.has(cart.id) ? '…' : `${effPercent}%`}
                       </button>
                     )}
-                    {!codeFor(cart) && activeCoupons.length > 0 && (
+                    {!armedCode && activeCoupons.length > 0 && (
                       <button onClick={() => { setPickerCart(cart); setPickerSelected(null) }}
-                        title="Pick from your existing active coupons"
-                        className="btn !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5"
-                        style={{ background: 'rgba(16,185,129,.1)', color: '#10b981', border: '1px solid rgba(16,185,129,.3)' }}>
-                        📎 Attach
-                      </button>
+                        title="Attach an existing coupon"
+                        className="btn btn-outline !px-3 !py-1.5 text-xs">Attach</button>
                     )}
                     {cart.checkout_url && (
-                      <a href={cart.checkout_url} target="_blank" rel="noopener noreferrer"
-                        title="Open customer's checkout link"
+                      <a href={cart.checkout_url} target="_blank" rel="noopener noreferrer" title="Open checkout link"
                         className="btn btn-primary !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5">
                         <ExternalLink size={12} /> Checkout
                       </a>
                     )}
-                    <button onClick={() => openWhatsApp(cart, codeFor(cart))} title="Send WhatsApp recovery message (Arabic)"
-                      className="btn !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5" style={{ background: 'rgba(37,211,102,.14)', color: '#25D366', border: '1px solid rgba(37,211,102,.3)' }}>
-                      <MessageCircle size={13} /> WhatsApp
+                    <button onClick={() => openWhatsApp(cart, armedCode)} title="Send WhatsApp recovery message"
+                      aria-label="Send WhatsApp recovery message"
+                      className="btn btn-outline !px-2.5 !py-1.5 inline-flex items-center">
+                      <MessageCircle size={14} />
                     </button>
-                    <button onClick={() => copyMsg(cart, codeFor(cart))} title="Copy Arabic recovery message"
-                      className="btn !px-2.5 !py-1.5 text-xs inline-flex items-center">
-                      {copied === cart.id ? <Check size={13} className="text-[var(--positive)]" /> : <Copy size={13} />}
+                    <button onClick={() => copyMsg(cart, armedCode)} title="Copy Arabic message" aria-label="Copy recovery message"
+                      className="btn btn-outline !px-2.5 !py-1.5 inline-flex items-center">
+                      {copied === cart.id ? <Check size={14} className="text-[var(--positive)]" /> : <Copy size={14} />}
                     </button>
                   </div>
                 </div>
@@ -523,19 +503,18 @@ export function CartRecovery() {
         </div>
       )}
 
-      {/* WABA foundation note */}
       <div className="glass-card px-4 py-3 text-[11px] text-[var(--text-muted)] flex items-start gap-2">
         <RefreshCw size={12} className="mt-0.5 shrink-0" />
         <span>
-          Manual recovery today — one tap sends via WhatsApp deep-link with a prefilled message.
-          Automated WhatsApp Business API campaigns are wired into the roadmap; the message templates here are already WABA-compatible.
+          Manual recovery today — WhatsApp deep-link with a prefilled Arabic message.
+          Automated WhatsApp Business API sending is wired and waiting for credentials.
         </span>
       </div>
 
-      {/* ── COUPON PICKER: rich cards → select → CONFIRM (never accidental) */}
+      {/* ── PICKER: rich cards → select → confirm */}
       {pickerCart && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] animate-[fadeIn_.2s_ease]" onClick={() => { setPickerCart(null); setPickerSelected(null) }} />
+          <div className="absolute inset-0 bg-black/45 animate-[fadeIn_.2s_ease]" onClick={() => { setPickerCart(null); setPickerSelected(null) }} />
           <div className="relative glass-card p-5 w-full max-w-lg space-y-4 animate-[pulseIn_.3s_var(--ease-spring)_both] max-h-[85vh] overflow-y-auto">
             <div>
               <div className="text-sm font-bold text-[var(--text-primary)]">Pick a coupon for <span dir="auto">{pickerCart.customer_name ?? 'Guest'}</span></div>
@@ -549,12 +528,12 @@ export function CartRecovery() {
                 const selected = pickerSelected?.id === ac.id
                 return (
                   <button key={ac.id} onClick={() => setPickerSelected(ac)}
-                    className="w-full text-left rounded-xl border px-4 py-3 transition-all flex items-center gap-3"
+                    className="w-full text-left rounded-xl border px-4 py-3 transition-colors flex items-center gap-3"
                     style={selected
-                      ? { borderColor: '#d29a0c', background: 'rgba(240,196,46,.1)', boxShadow: '0 0 0 1px #d29a0c55' }
+                      ? { borderColor: 'var(--brand)', background: 'var(--warning-soft)' }
                       : { borderColor: 'var(--hairline)', background: 'var(--card)' }}>
                     <span className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 font-mono text-xs font-bold"
-                      style={{ background: selected ? 'rgba(240,196,46,.18)' : 'var(--track)', color: selected ? '#d29a0c' : 'var(--text-primary)' }}>
+                      style={{ background: selected ? 'var(--warning-soft)' : 'var(--track)', color: selected ? 'var(--brand)' : 'var(--text-primary)' }}>
                       {ac.amount != null ? `${ac.amount}%` : '★'}
                     </span>
                     <span className="min-w-0 flex-1">
@@ -566,18 +545,17 @@ export function CartRecovery() {
                         {ac.amount != null ? `${ac.amount}% off` : 'Special'} · active now
                       </span>
                     </span>
-                    {selected && <Check size={16} style={{ color: '#d29a0c' }} className="shrink-0" />}
+                    {selected && <Check size={16} style={{ color: 'var(--brand)' }} className="shrink-0" />}
                   </button>
                 )
               })}
               {activeCoupons.length === 0 && (
                 <div className="text-xs text-[var(--text-muted)] py-4 text-center">
-                  No active coupons in your store — mint one with the {percent}% button, or create from the Coupons tab.
+                  No active coupons — mint one with the {percent}% button, or from the Coupons tab.
                 </div>
               )}
             </div>
 
-            {/* Confirm step — the ritual */}
             <div className="rounded-xl border border-[var(--hairline)] bg-[var(--card)] px-4 py-3 flex items-center gap-3">
               {pickerSelected ? (
                 <>

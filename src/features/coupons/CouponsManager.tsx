@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { TicketPercent, Trash2, RefreshCw, Sparkles, Clock, Users, ShoppingCart, Pencil, Power, Plus, Brain } from 'lucide-react'
+﻿import { useEffect, useMemo, useState } from 'react'
+import { TicketPercent, Trash2, RefreshCw, Sparkles, Clock, Users, ShoppingCart, Pencil, Power, Plus, Brain, Check } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toast } from '../../lib/toast'
 import { confirm } from '../../components/shared/Confirm'
 import { useApp } from '../../lib/store'
+import { cn } from '../../lib/utils'
 
 interface SallaCoupon {
   id: number
@@ -25,11 +26,11 @@ interface SallaCoupon {
 interface Preset { id: string; label: string; percent: number; hours: number; why: string }
 
 const DEFAULT_PRESETS: Preset[] = [
-  { id: 'recovery', label: '🛒 Cart recovery', percent: 15, hours: 48, why: 'Hesitation, not rejection — a meaningful gift converts fence-sitters' },
-  { id: 'winback', label: '😴 Win-back', percent: 20, hours: 168, why: 'Dormant customers need a stronger jolt to break inertia' },
-  { id: 'vip', label: '👑 VIP exclusive', percent: 10, hours: 72, why: 'Champions want status, not charity — small + exclusive' },
-  { id: 'first', label: '🌱 First order', percent: 10, hours: 336, why: 'Lowers the risk barrier for strangers' },
-  { id: 'flash', label: '⚡ Flash sale', percent: 25, hours: 24, why: 'High depth + tiny window = urgency spike' },
+  { id: 'recovery', label: 'Cart recovery', percent: 15, hours: 48, why: 'Hesitation, not rejection — a meaningful gift converts fence-sitters' },
+  { id: 'winback', label: 'Win-back', percent: 20, hours: 168, why: 'Dormant customers need a stronger jolt to break inertia' },
+  { id: 'vip', label: 'VIP exclusive', percent: 10, hours: 72, why: 'Champions want status, not charity — small + exclusive' },
+  { id: 'first', label: 'First order', percent: 10, hours: 336, why: 'Lowers the risk barrier for strangers' },
+  { id: 'flash', label: 'Flash sale', percent: 25, hours: 24, why: 'High depth + tiny window = urgency spike' },
 ]
 
 /** Doctrine hints — the bot whispers while you type */
@@ -38,7 +39,7 @@ function doctrine(percent: number): string {
   if (percent <= 12) return 'Conversion sweet spot — enough to tip a decision without training customers to wait for sales.'
   if (percent <= 18) return 'Rescue territory — for warm carts and one-time buyers who need a real reason.'
   if (percent <= 25) return 'Jolt dose — dormant/win-back and flash windows only. Never routine.'
-  return '⚠️ Margin burner — above 25% needs a strategic reason (clearance, win-back war). Use sparingly.'
+  return 'Margin burner — above 25% needs a strategic reason (clearance, win-back war). Use sparingly.'
 }
 
 export function CouponsManager() {
@@ -48,7 +49,7 @@ export function CouponsManager() {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // ── Playbook: fully editable, persisted in client settings (survives devices)
+  // Playbook: fully editable, persisted in client settings (survives devices)
   const client = state.clients.find((c) => c.id === state.currentClientId) ?? state.clients[0] ?? null
   const playbook: Preset[] = useMemo(() => {
     const saved = (client?.settings as { coupon_playbook?: Preset[] } | null)?.coupon_playbook
@@ -76,7 +77,7 @@ export function CouponsManager() {
     toast.success('Playbook saved — it follows you across devices')
   }
 
-  // ── Edit modal state
+  // Edit modal state
   const [editing, setEditing] = useState<SallaCoupon | null>(null)
   const [editPercent, setEditPercent] = useState(10)
   const [editExpiry, setEditExpiry] = useState('')
@@ -138,7 +139,8 @@ export function CouponsManager() {
     const ok = await confirm({
       title: `Clean ${dead.length} expired coupon${dead.length > 1 ? 's' : ''}?`,
       message: 'Deletes them from your Salla store.\nExpired codes are ops debt — they clutter the list and can leak if re-activated by accident.',
-      confirmLabel: 'Clean them', danger: true,
+      confirmLabel: 'Clean them',
+      danger: true,
     })
     if (!ok) return
     setCleaning(true)
@@ -183,7 +185,8 @@ export function CouponsManager() {
     const ok = await confirm({
       title: `Delete ${c.code}?`,
       message: 'Removes it from your Salla store permanently.\nAny cart still holding it will show a dead badge you can detach.',
-      confirmLabel: 'Delete forever', danger: true,
+      confirmLabel: 'Delete forever',
+      danger: true,
     })
     if (!ok) return
     try {
@@ -199,30 +202,31 @@ export function CouponsManager() {
     return coupons.slice().sort((a, b) => (b.usage.times ?? -1) - (a.usage.times ?? -1))
   }, [coupons])
 
+  const expiredCount = (coupons ?? []).filter((c) => c.expiryDate && new Date(c.expiryDate.replace(' ', 'T')).getTime() < Date.now()).length
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
-            <TicketPercent size={17} style={{ color: '#d29a0c' }} /> Coupons
+            <TicketPercent size={17} style={{ color: 'var(--brand)' }} /> Coupons
           </h2>
-          <div className="text-sm text-[var(--text-muted)]">Full control: mint, edit numbers, pause, resume, delete — with a brain that advises.</div>
+          <div className="text-sm text-[var(--text-muted)]">Mint, edit, pause, delete — with a brain that advises.</div>
         </div>
         <button onClick={() => void load()} className="btn btn-outline !text-xs !px-3 !py-2 inline-flex items-center gap-1.5">
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
         </button>
       </div>
 
-      {/* Expiry hygiene — one-tap ops debt cleanup */}
-      {(coupons ?? []).some((c) => c.expiryDate && new Date(c.expiryDate.replace(' ', 'T')).getTime() < Date.now()) && (
+      {expiredCount > 0 && (
         <button onClick={() => void cleanupExpired()} disabled={cleaning}
-          className="btn !text-xs !px-3 !py-2 inline-flex items-center gap-1.5 self-start"
-          style={{ background: 'rgba(239,68,68,.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,.25)' }}>
-          <Trash2 size={12} /> {cleaning ? 'Cleaning…' : 'Clean expired coupons'}
+          className="btn btn-outline !text-xs !px-3 !py-2 inline-flex items-center gap-1.5"
+          style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,.3)' }}>
+          <Trash2 size={12} /> {cleaning ? 'Cleaning…' : `Clean ${expiredCount} expired`}
         </button>
       )}
 
-      {/* ── PLAYBOOK (fully editable) */}
+      {/* Playbook */}
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
@@ -234,28 +238,36 @@ export function CouponsManager() {
           </button>
         </div>
         <div className="flex flex-wrap gap-2">
-          {playbook.map((p) => (
-            <span key={p.id}
-              className={`chip !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5 cursor-pointer group ${(presetId === p.id && customPercent == null) ? 'font-bold' : ''}`}
-              style={(presetId === p.id && customPercent == null) ? { borderColor: '#d29a0c88', color: '#d29a0c', background: 'rgba(240,196,46,.12)' } : undefined}
-              onClick={() => { setPresetId(p.id); setCustomPercent(null) }}
-              title={p.why}>
-              {p.label} · {p.percent}%
-              <button onClick={(e) => { e.stopPropagation(); setEditPreset(p) }} className="opacity-40 hover:opacity-100" title="Edit play"><Pencil size={10} /></button>
-              {playbook.length > 1 && (
-                <button onClick={(e) => { e.stopPropagation(); void savePlaybook(playbook.filter((x) => x.id !== p.id)) }} className="opacity-40 hover:opacity-100" style={{ color: '#ef4444' }} title="Delete play"><Trash2 size={10} /></button>
-              )}
-            </span>
-          ))}
+          {playbook.map((p) => {
+            const active = presetId === p.id && customPercent == null
+            return (
+              <div key={p.id} className="inline-flex items-center rounded-full border border-[var(--hairline)] overflow-hidden">
+                <button onClick={() => { setPresetId(p.id); setCustomPercent(null) }}
+                  className={cn('px-3 py-1.5 text-xs transition-colors', active ? 'font-semibold' : 'hover:bg-[var(--hover)]')}
+                  style={active ? { background: 'var(--warning-soft)', color: 'var(--brand)' } : undefined}
+                  title={p.why}>
+                  {p.label} · {p.percent}%
+                </button>
+                <button onClick={() => setEditPreset(p)} aria-label={`Edit ${p.label}`}
+                  className="self-stretch px-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover)] transition-colors">
+                  <Pencil size={10} />
+                </button>
+                {playbook.length > 1 && (
+                  <button onClick={() => void savePlaybook(playbook.filter((x) => x.id !== p.id))} aria-label={`Delete ${p.label}`}
+                    className="self-stretch px-1.5 text-[var(--text-muted)] hover:text-[#ef4444] hover:bg-[var(--hover)] transition-colors">
+                    <Trash2 size={10} />
+                  </button>
+                )}
+              </div>
+            )
+          })}
         </div>
-        <div className="text-[11px] text-[var(--text-muted)] italic">{preset.why || '—'}</div>
+        <div className="text-[11px] text-[var(--text-muted)]">{preset.why || '—'}</div>
 
-        <div className="flex flex-wrap items-center gap-4 pt-1">
-          <div className="flex items-center gap-2">
-            <Brain size={14} style={{ color: '#8b5cf6' }} />
-            <span className="text-xs text-[var(--text-muted)]">Doctrine:</span>
-            <span className="text-xs text-[var(--text-primary)]">{doctrine(percent)}</span>
-          </div>
+        <div className="flex items-center gap-2 text-xs">
+          <Brain size={13} className="text-[var(--text-muted)]" />
+          <span className="text-[var(--text-muted)]">Doctrine:</span>
+          <span className="text-[var(--text-primary)]">{doctrine(percent)}</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
@@ -266,9 +278,9 @@ export function CouponsManager() {
               className="field !w-20 !py-1.5 !text-sm tabular-nums" />
             <span className="text-xs text-[var(--text-muted)]">%</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Clock size={13} className="text-[var(--text-muted)]" />
-            <span className="text-xs text-[var(--text-muted)]">Expires in {hours >= 24 ? `${Math.round(hours / 24)} day${hours >= 48 ? 's' : ''}` : `${hours}h`}</span>
+          <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+            <Clock size={13} />
+            Expires in {hours >= 24 ? `${Math.round(hours / 24)} day${hours >= 48 ? 's' : ''}` : `${hours}h`}
           </div>
           <button onClick={() => void create()} disabled={creating}
             className="btn btn-primary !text-xs !px-4 !py-2 inline-flex items-center gap-1.5 ml-auto">
@@ -276,8 +288,8 @@ export function CouponsManager() {
           </button>
         </div>
 
-        {/* Margin shields + store-side targeting */}
-        <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-[var(--hairline)]">
+        {/* Shields + targeting */}
+        <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-[var(--hairline)]">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Shields</span>
           <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             Usage cap
@@ -303,12 +315,12 @@ export function CouponsManager() {
       </div>
 
       {error && (
-        <div className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,.25)' }}>
+        <div className="text-xs px-3 py-2 rounded-lg" style={{ background: 'var(--critical-soft)', color: 'var(--critical)' }}>
           {error}
         </div>
       )}
 
-      {/* ── LIST */}
+      {/* List */}
       {coupons === null && !error ? (
         <div className="glass-card p-8 text-center text-sm text-[var(--text-muted)]">Loading your coupons…</div>
       ) : sorted.length === 0 ? (
@@ -323,19 +335,22 @@ export function CouponsManager() {
             const dead = c.status !== 'active' || expired
             return (
               <div key={c.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 sm:gap-4">
-                <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 font-mono text-[10px] font-bold"
-                  style={{ background: dead ? 'var(--track)' : 'rgba(240,196,46,.14)', color: dead ? 'var(--text-muted)' : '#d29a0c' }}>
+                <span className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 font-mono text-xs font-bold"
+                  style={{ background: dead ? 'var(--track)' : 'var(--warning-soft)', color: dead ? 'var(--text-muted)' : 'var(--brand)' }}>
                   {c.type === 'percentage' ? `${c.amount ?? '?'}%` : 'FIX'}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-bold text-[var(--text-primary)] font-mono">{c.code}</span>
                     {c.name && <span className="text-[11px] text-[var(--text-muted)] truncate max-w-[140px]" dir="auto">{c.name}</span>}
-                    {c.isGroup && <span className="badge bg-[var(--track)] text-[var(--text-muted)] text-[9px]">group{c.groupCount ? ` ×${c.groupCount}` : ''}</span>}
-                    <span className="badge text-[9px]" style={
-                      dead ? { background: 'var(--track)', color: 'var(--text-muted)' }
-                        : { background: 'rgba(16,185,129,.12)', color: '#10b981' }
-                    }>{expired ? 'expired' : c.status}</span>
+                    {c.isGroup && <span className="text-[9px] text-[var(--text-muted)] border border-[var(--hairline)] rounded px-1">group{c.groupCount ? ` ×${c.groupCount}` : ''}</span>}
+                    {!dead ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-medium text-[var(--positive)]">
+                        <Check size={9} /> active
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-[var(--text-muted)]">{expired ? 'expired' : c.status}</span>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--text-muted)] mt-0.5">
                     {c.expiryDate && <span>exp {c.expiryDate.slice(0, 10)}</span>}
@@ -345,31 +360,37 @@ export function CouponsManager() {
                       <span className="flex items-center gap-1"><Users size={10} /> {c.usage.times} uses · {c.usage.customers ?? 0} customers</span>
                     )}
                     {c.usage.sales != null && c.usage.sales > 0 && (
-                      <span className="flex items-center gap-1 font-semibold text-[var(--positive)]"><ShoppingCart size={10} /> {Math.round(c.usage.sales).toLocaleString()} SAR earned</span>
+                      <span className="font-medium text-[var(--positive)]"><ShoppingCart size={10} className="inline mr-0.5" />{Math.round(c.usage.sales).toLocaleString()} SAR earned</span>
                     )}
                   </div>
                 </div>
-                <button onClick={() => { setEditing(c); setEditPercent(c.type === 'percentage' ? (c.amount ?? 10) : 10); setEditExpiry(c.expiryDate ? c.expiryDate.slice(0, 10) : '') }}
-                  title="Edit numbers / expiry" className="btn !px-2.5 !py-1.5 shrink-0"><Pencil size={13} /></button>
-                <button onClick={() => void toggleStatus(c)} disabled={expired}
-                  title={c.status === 'active' ? 'Pause (deactivate)' : 'Activate'}
-                  className="btn !px-2.5 !py-1.5 shrink-0" style={{ color: c.status === 'active' ? '#f59e0b' : '#10b981' }}>
-                  <Power size={13} />
-                </button>
-                <button onClick={() => void remove(c)} title="Delete from Salla store"
-                  className="btn !px-2.5 !py-1.5 shrink-0" style={{ color: '#ef4444' }}>
-                  <Trash2 size={13} />
-                </button>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button onClick={() => { setEditing(c); setEditPercent(c.type === 'percentage' ? (c.amount ?? 10) : 10); setEditExpiry(c.expiryDate ? c.expiryDate.slice(0, 10) : '') }}
+                    aria-label={`Edit ${c.code}`} title="Edit numbers / expiry"
+                    className="p-2 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover)] transition-colors">
+                    <Pencil size={14} />
+                  </button>
+                  <button onClick={() => void toggleStatus(c)} disabled={expired}
+                    aria-label={c.status === 'active' ? `Pause ${c.code}` : `Activate ${c.code}`}
+                    title={c.status === 'active' ? 'Pause (deactivate)' : 'Activate'}
+                    className="p-2 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover)] transition-colors disabled:opacity-30">
+                    <Power size={14} />
+                  </button>
+                  <button onClick={() => void remove(c)} aria-label={`Delete ${c.code}`} title="Delete from Salla store"
+                    className="p-2 rounded-md text-[var(--text-muted)] hover:text-[#ef4444] hover:bg-[var(--hover)] transition-colors">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             )
           })}
         </div>
       )}
 
-      {/* ── EDIT MODAL */}
+      {/* Edit modal */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setEditing(null)} />
+          <div className="absolute inset-0 bg-black/45 animate-[fadeIn_.2s_ease]" onClick={() => setEditing(null)} />
           <div className="relative glass-card p-6 w-full max-w-sm space-y-4 animate-[pulseIn_.3s_var(--ease-spring)_both]">
             <div className="text-sm font-bold text-[var(--text-primary)]">Edit <span className="font-mono">{editing.code}</span></div>
             <div className="space-y-3">
@@ -395,14 +416,14 @@ export function CouponsManager() {
         </div>
       )}
 
-      {/* ── PLAYBOOK EDIT MODAL */}
+      {/* Playbook edit modal */}
       {editPreset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setEditPreset(null)} />
+          <div className="absolute inset-0 bg-black/45 animate-[fadeIn_.2s_ease]" onClick={() => setEditPreset(null)} />
           <div className="relative glass-card p-6 w-full max-w-sm space-y-3 animate-[pulseIn_.3s_var(--ease-spring)_both]">
             <div className="text-sm font-bold text-[var(--text-primary)]">{playbook.some((p) => p.id === editPreset.id) ? 'Edit play' : 'New play'}</div>
             <input value={editPreset.label} onChange={(e) => setEditPreset({ ...editPreset, label: e.target.value })}
-              placeholder="Name (e.g. 🎉 Eid special)" className="field !py-2 text-sm" />
+              placeholder="Name (e.g. Eid special)" className="field !py-2 text-sm" />
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] text-[var(--text-muted)] uppercase">Percent</label>
