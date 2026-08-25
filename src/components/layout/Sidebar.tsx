@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   HeartPulse,
   Sunrise,
+  FlaskConical,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useApp } from '@/lib/store'
@@ -51,6 +52,7 @@ const allNavigation: {
   { name: 'Campaigns', path: '/campaigns', icon: Megaphone, section: 'campaigns' },
   { name: 'KPIs', path: '/kpis', icon: BarChart3, section: null },
   { name: 'Data & Sources', path: '/data', icon: Database, section: null },
+  { name: 'UI/UX Lab', path: '/lab', icon: FlaskConical, section: 'users' },
 ]
 
 export function Sidebar({ currentPath, onNavigate, onOpenNotifications }: SidebarProps) {

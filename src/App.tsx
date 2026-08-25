@@ -22,6 +22,7 @@ import { Orders } from './features/orders/Orders'
 import { CartRecovery } from './features/carts/CartRecovery'
 import { Retention } from './features/retention/Retention'
 import { Briefing } from './features/briefing/Briefing'
+import { Lab } from './features/lab/Lab'
 import { StoreProducts } from './features/store-products/StoreProducts'
 import { Reviews } from './features/reviews/Reviews'
 import { Kpis } from './features/kpis/Kpis'
@@ -51,6 +52,7 @@ const pageTitles: Record<string, string> = {
   '/data': 'Data & Sources',
   '/report': 'Client Report',
   '/settings': 'Settings',
+  '/lab': 'UI/UX Lab',
 }
 
 function App() {
@@ -143,6 +145,8 @@ function App() {
         return <Report />
       case '/settings':
         return <Settings />
+      case '/lab':
+        return <Lab />
       default:
         return (
           <div className="p-10 text-center space-y-3">
