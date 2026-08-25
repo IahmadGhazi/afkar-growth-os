@@ -1,8 +1,9 @@
-﻿import { useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import {
   FlaskConical, Check, X, Sparkles, Sun, Moon, MessageSquare,
   FileText, Target, BarChart3, Command, HeartPulse, TrendingUp, Users, ShoppingBag,
 } from 'lucide-react'
+import { getStoredTheme } from '../../lib/theme'
 import { cn } from '../../lib/utils'
 
 /* ═══════════════════════════════════════════════════════════
@@ -86,8 +87,25 @@ function ProtoShell({ p, verdicts, set, children }: { p: Proto; verdicts: Record
 }
 
 export function Lab() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(document.documentElement.classList.contains('dark') ? 'dark' : 'light')
+  // Preview starts from your REAL current theme
+  const [theme, setTheme] = useState<'light' | 'dark'>(getStoredTheme())
   const [verdicts, setVerdicts] = useState<Record<number, Verdict>>({})
+
+  // True preview: flips the live data-theme attribute (what every token reads),
+  // and restores your saved theme when you leave the Lab.
+  const togglePreview = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    const root = document.documentElement
+    if (next === 'dark') root.setAttribute('data-theme', 'dark')
+    else root.removeAttribute('data-theme')
+  }
+  useEffect(() => () => {
+    const stored = getStoredTheme()
+    const root = document.documentElement
+    if (stored === 'dark') root.setAttribute('data-theme', 'dark')
+    else root.removeAttribute('data-theme')
+  }, [])
 
   const set = (n: number, v: Verdict) => setVerdicts((prev) => ({ ...prev, [n]: v }))
   const approved = Object.entries(verdicts).filter(([, v]) => v === 'approved').map(([n]) => n)
@@ -105,7 +123,7 @@ export function Lab() {
             {PROTOS.length} numbered prototypes, rendered live. Nothing touches production until you approve by number.
           </div>
         </div>
-        <button onClick={() => setTheme((t) => t === 'dark' ? 'light' : 'dark')}
+        <button onClick={togglePreview}
           className="btn btn-outline !text-xs !px-3 !py-2 inline-flex items-center gap-1.5">
           {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
           {theme === 'dark' ? 'Light' : 'Dark'} preview
