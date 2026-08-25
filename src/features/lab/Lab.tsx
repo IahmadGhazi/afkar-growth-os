@@ -79,7 +79,7 @@ export function Lab() {
       {/* Theme preview scope note */}
       <div className="rounded-xl border border-[var(--hairline)] bg-[var(--card)] px-4 py-3 text-xs text-[var(--text-muted)] flex items-center gap-2">
         <Info size={13} className="shrink-0" />
-        Components below render inside a preview frame forced to <b>{theme}</b> tokens — how they'll look promoted.
+        Components below render inside a preview frame in <b>{theme}</b> tokens — how they'll look promoted.
         Full-page dark/light verification happens per promotion.
       </div>
 
