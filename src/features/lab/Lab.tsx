@@ -1,261 +1,293 @@
 ﻿import { useState } from 'react'
 import {
-  FlaskConical, Check, Palette, Sparkles, Info,
-  Type, Ruler, MousePointerClick, Layers, Sun, Moon,
+  FlaskConical, Check, X, Sparkles, Sun, Moon, MessageSquare,
+  FileText, Target, BarChart3, Command, HeartPulse, TrendingUp, Users, ShoppingBag,
 } from 'lucide-react'
+import { cn } from '../../lib/utils'
 
-interface ShippedFinding {
+/* ═══════════════════════════════════════════════════════════
+   UI/UX LAB v3 — PROTOTYPE GALLERY
+   Numbered, live-rendered proposals. Approve by number.
+   Production stays untouched until you say the word.
+   ═══════════════════════════════════════════════════════════ */
+
+type Verdict = 'none' | 'approved' | 'skipped'
+
+interface Proto {
+  n: number
   id: string
   title: string
-  detail: string
-  shippedIn: string
+  why: string
+  effort: 'S' | 'M'
+  targets: string
 }
 
-const SHIPPED: ShippedFinding[] = [
-  { id: 'F1', title: '15 duplicate page titles stripped', detail: 'TopBar owns the title; pages speak through content.', shippedIn: 'Promotion pass 1' },
-  { id: 'F2', title: 'One primary button per view', detail: '11 demotions across Data, Tasks, Integrations, Products, Campaigns.', shippedIn: 'Promotion pass 1' },
-  { id: 'F3', title: 'Spacing rhythm codified', detail: 'pages space-y-6 · cards p-5 · rows py-3 — constitution published in tokens.', shippedIn: 'Promotion pass 1' },
-  { id: 'F4', title: 'Solid modal surfaces', detail: 'Glass-over-overlay gray mud eliminated in both themes.', shippedIn: 'UI reckoning' },
-  { id: 'F5', title: 'Browser confirms exterminated', detail: 'App-styled dialogs everywhere, including Disconnect.', shippedIn: 'Promotion pass 1' },
-  { id: 'F6', title: 'Ghost tokens buried', detail: 'var(--gold) and var(--gold-soft) replaced with real tokens.', shippedIn: 'Promotion pass 1' },
-  { id: 'F7', title: 'Sticky topbar + solid app bar', detail: 'Wrapper-pin fix below lg; content no longer ghosts through.', shippedIn: 'Navigation era' },
+const PROTOS: Proto[] = [
+  { n: 1, id: 'chat-palette', title: 'Chat member identity palette', why: '18 ad-hoc hues today — members can share colors and some wash out in dark mode. One curated 8-color set, even spacing, calibrated for both themes.', effort: 'S', targets: 'Team Chat' },
+  { n: 2, id: 'goal-gauge', title: 'Goal gauge on Command Center', why: 'Set a monthly target → see daily run-rate and a live gap arrow. Turns the dashboard into a commitment device.', effort: 'M', targets: 'Command Center' },
+  { n: 3, id: 'report-print', title: 'Report print discipline', why: 'The client-facing sheet: near-monochrome ink ramp + gold. Legibility and restraint, not rainbow.', effort: 'S', targets: 'Client Report' },
+  { n: 4, id: 'coupon-roi', title: 'Coupon ROI mini-chart', why: 'coupon.applied is live — rescued carts per code, plotted. Proof the coupons earn.', effort: 'M', targets: 'Cart Recovery / Coupons' },
+  { n: 5, id: 'cmdk-v2', title: 'Command palette v2 (⌘K)', why: 'QuickAdd grows up: navigate anywhere, run actions, all from one keyboard-first palette.', effort: 'M', targets: 'Global' },
+  { n: 6, id: 'retention-harmony', title: 'Retention segment harmonization', why: '7 RFM identities into one saturation family — distinct hues, designed-together feel.', effort: 'S', targets: 'Retention' },
 ]
 
-const INVENTIONS: { title: string; why: string; effort: string }[] = [
-  { title: 'Chat member palette curation', why: '18 ad-hoc hues to one curated 8-color identity set, calibrated for light and dark.', effort: 'S' },
-  { title: 'Goal gauge on Command Center', why: 'Monthly target to daily run-rate to a live gap arrow — the number that focuses everything.', effort: 'M' },
-  { title: 'Report print discipline', why: 'Near-monochrome ink ramp plus gold accents — the client-facing sheet deserves restraint.', effort: 'S' },
-  { title: 'Coupon ROI mini-chart', why: 'coupon.applied is live — renders rescued carts over time per code.', effort: 'M' },
-  { title: 'Keyboard command palette (v2)', why: 'QuickAdd exists; a full nav-plus-action palette is the power-user unlock.', effort: 'M' },
-  { title: 'Retention segment harmonization', why: 'Seven RFM identities into one saturation family with distinct hues.', effort: 'S' },
-]
+/* ── sample data ── */
+const CHAOS = ['#ec4899', '#6366f1', '#14b8a6', '#f97316', '#8b5cf6', '#0fa96c']
+const CURATED = ['#d29a0c', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4']
+const MEMBERS = ['Ghazi', 'Sara', 'MAHMOUD', 'Fatima', 'TestSara', 'Noura']
 
-function SectionTitle({ icon: Icon, children }: { icon: typeof FlaskConical; children: React.ReactNode }) {
+function VerdictButtons({ n, verdicts, set }: { n: number; verdicts: Record<number, Verdict>; set: (n: number, v: Verdict) => void }) {
+  const v = verdicts[n] ?? 'none'
   return (
-    <div className="flex items-center gap-2 mb-3">
-      <Icon size={15} style={{ color: 'var(--brand)' }} />
-      <h3 className="text-sm font-semibold text-[var(--text-primary)]">{children}</h3>
+    <div className="flex items-center gap-2">
+      <button onClick={() => set(n, 'approved')}
+        className={cn('btn !text-xs !px-3 !py-1.5 inline-flex items-center gap-1.5',
+          v === 'approved' ? 'btn-primary' : 'btn-outline')}
+        style={v === 'approved' ? undefined : { color: 'var(--positive)', borderColor: 'rgba(16,185,129,.35)' }}>
+        <Check size={12} /> Approve
+      </button>
+      <button onClick={() => set(n, 'skipped')}
+        className={cn('btn !text-xs !px-3 !py-1.5 inline-flex items-center gap-1.5',
+          v === 'skipped' ? 'btn-primary' : 'btn-outline')}>
+        <X size={12} /> Skip
+      </button>
+      {v !== 'none' && (
+        <span className="text-[11px] font-semibold" style={{ color: v === 'approved' ? 'var(--positive)' : 'var(--text-muted)' }}>
+          {v === 'approved' ? 'Queued for build' : 'Skipped'}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function ProtoShell({ p, verdicts, set, children }: { p: Proto; verdicts: Record<number, Verdict>; set: (n: number, v: Verdict) => void; children: React.ReactNode }) {
+  const v = verdicts[p.n] ?? 'none'
+  return (
+    <div className="glass-card overflow-hidden" style={v === 'approved' ? { borderColor: 'var(--brand)', boxShadow: '0 0 0 1px var(--brand)' } : v === 'skipped' ? { opacity: 0.55 } : undefined}>
+      <div className="px-5 pt-4 pb-3 flex items-start gap-3 flex-wrap">
+        <span className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-sm font-bold shrink-0"
+          style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}>{p.n}</span>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold text-[var(--text-primary)]">{p.title}</div>
+          <div className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{p.why}</div>
+          <div className="flex gap-1.5 mt-1.5 flex-wrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--track)] text-[var(--text-muted)]">effort {p.effort}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--track)] text-[var(--text-muted)]">{p.targets}</span>
+          </div>
+        </div>
+        <VerdictButtons n={p.n} verdicts={verdicts} set={set} />
+      </div>
+      {/* live prototype frame */}
+      <div className="px-5 pb-5">
+        <div className="rounded-xl border border-[var(--hairline)] bg-[var(--bg)] p-4 overflow-hidden">{children}</div>
+      </div>
     </div>
   )
 }
 
 export function Lab() {
   const [theme, setTheme] = useState<'light' | 'dark'>(document.documentElement.classList.contains('dark') ? 'dark' : 'light')
+  const [verdicts, setVerdicts] = useState<Record<number, Verdict>>({})
+
+  const set = (n: number, v: Verdict) => setVerdicts((prev) => ({ ...prev, [n]: v }))
+  const approved = Object.entries(verdicts).filter(([, v]) => v === 'approved').map(([n]) => n)
 
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-6 max-w-5xl">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
             <FlaskConical size={18} style={{ color: 'var(--brand)' }} />
-            UI/UX Lab
+            UI/UX Lab — Prototype Gallery
           </h2>
           <div className="text-sm text-[var(--text-muted)]">
-            Staging ground — every fix renders here first. Nothing promotes without your approval.
+            {PROTOS.length} numbered prototypes, rendered live. Nothing touches production until you approve by number.
           </div>
         </div>
         <button onClick={() => setTheme((t) => t === 'dark' ? 'light' : 'dark')}
           className="btn btn-outline !text-xs !px-3 !py-2 inline-flex items-center gap-1.5">
           {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
-          Preview {theme === 'dark' ? 'light' : 'dark'}
+          {theme === 'dark' ? 'Light' : 'Dark'} preview
         </button>
       </div>
 
-      <div className="rounded-xl border border-[var(--hairline)] bg-[var(--card)] px-4 py-3 text-xs text-[var(--text-muted)] flex items-center gap-2">
-        <Info size={13} className="shrink-0" />
-        Sweep one is fully shipped (archive below). The register is clear — new findings and experiments land here.
+      {/* Your verdict summary */}
+      <div className="rounded-xl border border-[var(--hairline)] bg-[var(--card)] px-4 py-3 text-xs flex flex-wrap items-center gap-2">
+        <Sparkles size={13} style={{ color: 'var(--brand)' }} />
+        {approved.length === 0 ? (
+          <span className="text-[var(--text-muted)]">Review the prototypes below — then tell me your numbers (e.g. "1, 2 and 5 approved; 3 and 4 not").</span>
+        ) : (
+          <span className="text-[var(--text-primary)]">
+            Approved: <b>{approved.join(', ')}</b> · Skipped: {Object.entries(verdicts).filter(([, v]) => v === 'skipped').map(([n]) => n).join(', ') || 'none'}
+          </span>
+        )}
       </div>
 
-      {/* Shipped archive */}
-      <section>
-        <SectionTitle icon={Check}>Shipped from the Lab — {SHIPPED.length} fixes living in production</SectionTitle>
-        <div className="glass-card divide-y divide-[var(--hairline)] overflow-hidden">
-          {SHIPPED.map((f) => (
-            <div key={f.id} className="px-4 sm:px-5 py-3 flex items-start gap-3">
-              <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center bg-[var(--positive-soft)]">
-                <Check size={12} className="text-[var(--positive)]" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-[var(--text-primary)]">{f.title}</div>
-                <div className="text-xs text-[var(--text-muted)] mt-0.5">{f.detail}</div>
-              </div>
-              <span className="shrink-0 text-[10px] text-[var(--text-muted)] border border-[var(--hairline)] rounded px-1.5 py-0.5">{f.shippedIn}</span>
+      {/* ── P1 CHAT PALETTE */}
+      <ProtoShell p={PROTOS[0]} verdicts={verdicts} set={set}>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-2">Current — 18 ad-hoc hues</div>
+            <div className="space-y-1.5">
+              {MEMBERS.slice(0, 5).map((m, i) => (
+                <div key={m} className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: CHAOS[i] }}>{m[0]}</span>
+                  <span className="text-xs font-medium" style={{ color: CHAOS[i] }}>{m}</span>
+                </div>
+              ))}
+              <div className="text-[10px] text-[var(--text-muted)] pt-1">+12 more hues… uneven saturation, dark-mode washouts</div>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Invention queue */}
-      <section>
-        <SectionTitle icon={Sparkles}>Invention queue — what I think we test next</SectionTitle>
-        <div className="grid sm:grid-cols-2 gap-3">
-          {INVENTIONS.map((inv, i) => (
-            <div key={i} className="glass-card p-4 flex items-start gap-3">
-              <span className="shrink-0 mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--track)] text-[var(--text-muted)]">{inv.effort}</span>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-[var(--text-primary)]">{inv.title}</div>
-                <div className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{inv.why}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="text-[11px] text-[var(--text-muted)] mt-2">
-          Pick one — or say "all S items" — it gets prototyped here first, then promoted with proof.
-        </div>
-      </section>
-
-      {/* Tokens */}
-      <section id="lab-tokens">
-        <SectionTitle icon={Palette}>Design tokens — the constitution</SectionTitle>
-        <div className="glass-card p-5 space-y-4">
-          <p className="text-xs text-[var(--text-muted)]">
-            One rhythm: pages <code className="px-1 rounded bg-[var(--track)]">space-y-6</code>, cards <code className="px-1 rounded bg-[var(--track)]">p-5</code>,
-            rows <code className="px-1 rounded bg-[var(--track)]">py-3</code>. One accent: <b style={{ color: 'var(--brand)' }}>gold</b> for actions.
-            Semantic colors speak only for status.
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { v: 'var(--brand)', n: 'brand / action' },
-              { v: '#10b981', n: 'positive status' },
-              { v: '#f59e0b', n: 'warning status' },
-              { v: '#ef4444', n: 'danger status' },
-            ].map((c) => (
-              <div key={c.n} className="rounded-lg border border-[var(--hairline)] overflow-hidden">
-                <div className="h-10" style={{ background: c.v }} />
-                <div className="px-2 py-1.5 text-[10px] text-[var(--text-muted)]">{c.n}</div>
-              </div>
-            ))}
           </div>
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2">Type ramp</div>
-            <div className="space-y-1">
-              <div className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">1,058 <span className="text-sm font-medium">hero numerals</span></div>
-              <div className="text-sm font-semibold text-[var(--text-primary)]">Section title · semibold 14</div>
-              <div className="text-xs text-[var(--text-muted)]">Body muted 12 · the workhorse line</div>
-              <div className="text-[11px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">Eyebrow label 11</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <Ruler size={13} className="text-[var(--text-muted)]" />
-            <span className="text-[var(--text-muted)]">Radii: cards 18 · controls 10 · chips full — consistent, keep it.</span>
-          </div>
-        </div>
-      </section>
-
-      {/* PageHeader pattern */}
-      <section id="lab-page-header">
-        <SectionTitle icon={Type}>Pattern — PageHeader (shipped: 15 titles stripped)</SectionTitle>
-        <div className="glass-card overflow-hidden">
-          <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[var(--hairline)]">
-            <div className="p-5">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-2">Before</div>
-              <div className="space-y-2 opacity-80">
-                <div className="text-sm font-semibold">Cart Recovery <span className="text-[var(--text-muted)] font-normal">(TopBar)</span></div>
-                <div className="text-lg font-semibold text-[var(--text-primary)]">Cart Recovery <span className="text-[var(--text-muted)] font-normal text-sm">(page repeated it)</span></div>
-                <div className="text-sm font-semibold text-[var(--text-primary)]">Coupons <span className="text-[var(--text-muted)] font-normal text-xs">(tab repeated again)</span></div>
-              </div>
-            </div>
-            <div className="p-5 border-l-2" style={{ borderColor: 'var(--brand)' }}>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">After</div>
-              <div className="space-y-2">
-                <div className="text-sm font-semibold">Cart Recovery <span className="text-[var(--text-muted)] font-normal">(TopBar owns the title)</span></div>
-                <div className="text-sm text-[var(--text-muted)]">Pages speak through content: one metric line, no echo.</div>
-              </div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">Proposed — curated 8</div>
+            <div className="space-y-1.5">
+              {MEMBERS.map((m, i) => (
+                <div key={m} className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: CURATED[i % CURATED.length] }}>{m[0]}</span>
+                  <span className="text-xs font-medium" style={{ color: CURATED[i % CURATED.length] }}>{m}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </section>
+      </ProtoShell>
 
-      {/* Button hierarchy pattern */}
-      <section id="lab-buttons">
-        <SectionTitle icon={MousePointerClick}>Pattern — Button hierarchy (shipped: 11 demotions)</SectionTitle>
-        <div className="glass-card p-5 space-y-4">
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-2">Before — Data and Sources</div>
-              <div className="flex flex-wrap gap-2">
-                <button className="btn btn-primary !text-xs !px-3 !py-1.5">Connect</button>
-                <button className="btn btn-primary !text-xs !px-3 !py-1.5">Sync all</button>
-                <button className="btn btn-primary !text-xs !px-3 !py-1.5">Import</button>
-                <button className="btn btn-primary !text-xs !px-3 !py-1.5">Save sheet</button>
-              </div>
-              <div className="text-[11px] text-[var(--text-muted)] mt-2">Five gold buttons = zero hierarchy.</div>
+      {/* ── P2 GOAL GAUGE */}
+      <ProtoShell p={PROTOS[1]} verdicts={verdicts} set={set}>
+        <div className="flex flex-wrap items-center gap-8">
+          {/* gauge */}
+          <div className="relative w-40 h-24">
+            <svg viewBox="0 0 200 110" className="w-full h-full">
+              <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--track)" strokeWidth="14" strokeLinecap="round" />
+              <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--brand)" strokeWidth="14" strokeLinecap="round"
+                strokeDasharray="251" strokeDashoffset="70" />
+              <text x="100" y="88" textAnchor="middle" className="fill-[var(--text-primary)]" style={{ fontSize: 26, fontWeight: 800 }}>72%</text>
+              <text x="100" y="104" textAnchor="middle" fill="var(--text-muted)" style={{ fontSize: 10 }}>of monthly target</text>
+            </svg>
+          </div>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <Target size={14} style={{ color: 'var(--brand)' }} />
+              <span className="text-[var(--text-muted)]">Target</span>
+              <b className="text-[var(--text-primary)] tabular-nums">150,000 SAR</b>
             </div>
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">After</div>
-              <div className="flex flex-wrap gap-2 items-center">
-                <button className="btn btn-primary !text-xs !px-3 !py-1.5">Sync now</button>
-                <button className="btn btn-outline !text-xs !px-3 !py-1.5">Connect platform</button>
-                <button className="btn btn-outline !text-xs !px-3 !py-1.5">Import sheet</button>
-                <button className="btn !text-xs !px-3 !py-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]">Fetch rates</button>
-              </div>
-              <div className="text-[11px] text-[var(--text-muted)] mt-2">One filled = the page's job. Outlines = choices. Ghost = tertiary.</div>
+            <div className="flex items-center gap-2">
+              <TrendingUp size={14} className="text-[var(--positive)]" />
+              <span className="text-[var(--text-muted)]">Month-to-date</span>
+              <b className="text-[var(--text-primary)] tabular-nums">108,400 SAR</b>
+            </div>
+            <div className="flex items-center gap-2">
+              <BarChart3 size={14} className="text-[var(--text-muted)]" />
+              <span className="text-[var(--text-muted)]">Needed / day</span>
+              <b className="text-[var(--text-primary)] tabular-nums">4,160 SAR</b>
+            </div>
+            <div className="text-xs px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1.5 mt-1"
+              style={{ background: 'rgba(16,185,129,.1)', color: 'var(--positive)' }}>
+              On pace — keep this rhythm and you land 4% above target
             </div>
           </div>
         </div>
-      </section>
+      </ProtoShell>
 
-      {/* StatHero pattern */}
-      <section id="lab-stat-hero">
-        <SectionTitle icon={Layers}>Pattern — StatHero band (shipped in Cart Recovery)</SectionTitle>
-        <div className="glass-card p-5">
-          <div className="rounded-xl border border-[var(--hairline)] bg-[var(--bg)] p-6 flex flex-wrap lg:flex-nowrap items-center gap-8">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Pipeline value</div>
-              <div className="text-5xl font-extrabold text-[var(--text-primary)] tabular-nums mt-1 leading-none">2,340 <span className="text-xl font-bold">SAR</span></div>
-              <div className="text-sm text-[var(--text-muted)] mt-2">across 7 open deals</div>
-            </div>
-            <div className="flex-1 min-w-[200px]">
-              <div className="flex h-3 rounded-full overflow-hidden bg-[var(--track)]">
-                <div className="w-1/4" style={{ background: '#ef4444' }} />
-                <div className="w-1/2" style={{ background: '#f59e0b' }} />
-                <div className="w-1/4" style={{ background: '#94a3b8' }} />
-              </div>
-              <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3 text-xs text-[var(--text-muted)]">
-                <span><span className="w-2 h-2 rounded-full mr-1.5 inline-block" style={{ background: '#ef4444' }} />Now · <b className="text-[var(--text-primary)]">587</b></span>
-                <span><span className="w-2 h-2 rounded-full mr-1.5 inline-block" style={{ background: '#f59e0b' }} />This week · <b className="text-[var(--text-primary)]">1,170</b></span>
-                <span><span className="w-2 h-2 rounded-full mr-1.5 inline-block" style={{ background: '#94a3b8' }} />Later · <b className="text-[var(--text-primary)]">583</b></span>
-              </div>
+      {/* ── P3 REPORT PRINT */}
+      <ProtoShell p={PROTOS[2]} verdicts={verdicts} set={set}>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="rounded-lg border border-[var(--hairline)] bg-white p-4">
+            <div className="text-[10px] font-semibold uppercase text-[#ef4444] mb-2">Current — 8 hues on paper</div>
+            <div className="space-y-1.5 text-[13px]" style={{ color: '#171a21' }}>
+              <div>Revenue <b style={{ color: '#0fa96c' }}>+81%</b> · Spend <b style={{ color: '#dd5a5a' }}>+0%</b></div>
+              <div>ROAS <b style={{ color: '#c8920b' }}>25.9x</b> · CAC <b style={{ color: '#e0902e' }}>12.6</b></div>
+              <div className="text-[11px]" style={{ color: '#969eab' }}>Two greens, two reds, two ambers…</div>
             </div>
           </div>
-          <div className="pt-3 mt-3 border-t border-[var(--hairline)] text-[11px] text-[var(--text-muted)]">
-            Next targets: Campaigns totals, Orders revenue, Retention LTV.
+          <div className="rounded-lg border border-[var(--hairline)] bg-white p-4">
+            <div className="text-[10px] font-semibold uppercase text-[var(--positive)] mb-2">Proposed — ink + gold</div>
+            <div className="space-y-1.5 text-[13px]" style={{ color: '#171a21' }}>
+              <div>Revenue <b style={{ color: '#0fa96c' }}>+81%</b> · Spend <b>±0%</b></div>
+              <div>ROAS <b style={{ color: '#c8920b' }}>25.9x</b> · CAC <b>12.6</b></div>
+              <div className="text-[11px]" style={{ color: '#565d6b' }}>One green, one gold, ink for the rest — print-calm.</div>
+            </div>
           </div>
         </div>
-      </section>
+      </ProtoShell>
 
-      {/* Status semantics pattern */}
-      <section id="lab-status">
-        <SectionTitle icon={Palette}>Pattern — Status semantics (colors that mean something)</SectionTitle>
-        <div className="glass-card p-5 grid md:grid-cols-2 gap-6">
+      {/* ── P4 COUPON ROI */}
+      <ProtoShell p={PROTOS[3]} verdicts={verdicts} set={set}>
+        <div className="flex flex-wrap items-end gap-6">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-2">Never again</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Recovered by coupons</div>
+            <div className="text-4xl font-extrabold text-[var(--text-primary)] tabular-nums mt-1">3,470 <span className="text-lg font-bold">SAR</span></div>
+            <div className="text-xs text-[var(--text-muted)] mt-1">7 carts rescued · 4 codes in play</div>
+          </div>
+          <div className="flex-1 min-w-[220px]">
+            <div className="flex items-end gap-2 h-24">
+              {[30, 45, 35, 60, 52, 78, 100].map((h, i) => (
+                <div key={i} className="flex-1 rounded-t-md" style={{ height: `${h}%`, background: i === 6 ? 'var(--brand)' : 'var(--track)' }} />
+              ))}
+            </div>
+            <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
+              <span>6w ago</span><span>last week</span><span className="font-semibold" style={{ color: 'var(--brand)' }}>this week</span>
+            </div>
+          </div>
+        </div>
+      </ProtoShell>
+
+      {/* ── P5 COMMAND PALETTE */}
+      <ProtoShell p={PROTOS[4]} verdicts={verdicts} set={set}>
+        <div className="max-w-md mx-auto">
+          <div className="rounded-xl border border-[var(--hairline)] bg-[var(--card)] shadow-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-[var(--hairline)] flex items-center gap-2">
+              <Command size={14} style={{ color: 'var(--brand)' }} />
+              <span className="text-sm text-[var(--text-muted)]">Type a command or search…</span>
+              <span className="ml-auto text-[10px] text-[var(--text-muted)] border border-[var(--hairline)] rounded px-1.5 py-0.5">ESC</span>
+            </div>
+            <div className="px-2 py-2 space-y-0.5">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] px-2 py-1">Navigate</div>
+              {[['Orders', ShoppingBag], ['Cart Recovery', HeartPulse], ['Customers', Users]].map(([label, Icon]: any) => (
+                <div key={label} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs hover:bg-[var(--hover)]">
+                  <Icon size={13} className="text-[var(--text-muted)]" /> {label}
+                </div>
+              ))}
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] px-2 py-1 pt-2">Actions</div>
+              {[['Log numbers', BarChart3], ['Mint a coupon', FileText]].map(([label, Icon]: any) => (
+                <div key={label} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs hover:bg-[var(--hover)]">
+                  <Icon size={13} className="text-[var(--text-muted)]" /> {label}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="text-[11px] text-[var(--text-muted)] text-center mt-2">QuickAdd, navigation and actions — one ⌘K away.</div>
+        </div>
+      </ProtoShell>
+
+      {/* ── P6 RETENTION HARMONY */}
+      <ProtoShell p={PROTOS[5]} verdicts={verdicts} set={set}>
+        <div className="space-y-4">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-2">Current — scattered saturation</div>
             <div className="flex flex-wrap gap-2">
-              <span className="chip" style={{ background: '#8b5cf622', color: '#8b5cf6' }}>purple chip</span>
-              <span className="chip" style={{ background: '#06b6d422', color: '#06b6d4' }}>cyan chip</span>
-              <span className="chip" style={{ background: '#ec489922', color: '#ec4899' }}>pink chip</span>
-              <span className="text-xs text-[var(--text-muted)] self-center">= decoration, no meaning</span>
+              {[['Champions', '#d29a0c'], ['Loyal', '#3b82f6'], ['Promising', '#8b5cf6'], ['New', '#10b981'], ['One-time', '#64748b'], ['At Risk', '#f59e0b'], ['Dormant', '#ef4444']].map(([l, c]: any) => (
+                <span key={l} className="chip text-xs" style={{ color: c, background: `${c}1a` }}>{l}</span>
+              ))}
             </div>
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">The vocabulary</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">Proposed — one family, distinct hues</div>
             <div className="flex flex-wrap gap-2">
-              <span className="chip" style={{ background: 'rgba(16,185,129,.12)', color: '#10b981' }}>live / done</span>
-              <span className="chip" style={{ background: 'rgba(245,158,11,.12)', color: '#f59e0b' }}>warning / pending</span>
-              <span className="chip" style={{ background: 'rgba(239,68,68,.12)', color: '#ef4444' }}>problem / overdue</span>
-              <span className="chip bg-[var(--track)] text-[var(--text-muted)]">neutral / off</span>
+              {[['Champions', '#b8860b'], ['Loyal', '#9a7b0a'], ['Promising', '#7a6d9e'], ['New', '#4a8fa8'], ['One-time', '#64748b'], ['At Risk', '#b8742a'], ['Dormant', '#8a5a5a']].map(([l, c]: any) => (
+                <span key={l} className="chip text-xs" style={{ color: c, background: `${c}18`, borderColor: `${c}40` }}>{l}</span>
+              ))}
             </div>
-          </div>
-          <div className="md:col-span-2 pt-3 border-t border-[var(--hairline)] text-[11px] text-[var(--text-muted)]">
-            Domain palettes (order statuses, shipment states) draw only from these four families.
+            <div className="text-[11px] text-[var(--text-muted)] mt-2">Muted, equal saturation — the set reads as one system.</div>
           </div>
         </div>
-      </section>
+      </ProtoShell>
 
-      {/* Footer */}
-      <div className="glass-card px-5 py-4 text-xs text-[var(--text-muted)] leading-relaxed">
-        <b className="text-[var(--text-primary)]">How promotion works:</b> you approve patterns here → they are implemented against target files in a dedicated pass → each promotion ships with before/after screenshots → nothing touches production until you have seen it rendered.
+      {/* Archive pointer */}
+      <div className="glass-card px-5 py-4 text-xs text-[var(--text-muted)] flex items-center gap-2">
+        <MessageSquare size={12} className="shrink-0" />
+        <span>Sweep-one archive (7 shipped fixes) lives in the previous Lab revision — every item is in production today.</span>
       </div>
     </div>
   )
