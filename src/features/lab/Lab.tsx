@@ -1,41 +1,34 @@
-import { useMemo, useState } from 'react'
+﻿import { useState } from 'react'
 import {
-  FlaskConical, AlertTriangle, AlertCircle, Info, Check, Palette,
-  Type, Ruler, MousePointerClick, Layers, Sun, Moon, ArrowRight,
+  FlaskConical, Check, Palette, Sparkles, Info,
+  Type, Ruler, MousePointerClick, Layers, Sun, Moon,
 } from 'lucide-react'
 
-/* ────────────────────────────────────────────────────────────
-   UI/UX LAB — the staging ground.
-   Every proposed fix lands HERE first, rendered LIVE with real
-   tokens, before any promotion into the production surfaces.
-   The rest of the app stays read-only while you review.
-   ──────────────────────────────────────────────────────────── */
-
-interface Finding {
+interface ShippedFinding {
   id: string
-  severity: 'P0' | 'P1' | 'P2'
-  area: string
   title: string
   detail: string
-  files: string[]
-  labFix?: string // which lab pattern below addresses it
+  shippedIn: string
 }
 
-const FINDINGS: Finding[] = [
-  { id: 'F1', severity: 'P0', area: 'Global', title: '15 pages render a duplicate title', detail: 'TopBar already displays the page name; every page ALSO renders its own <h2>. Three levels of "Products" repeat on one screen.', files: ['Briefing', 'Campaigns', 'CartRecovery', 'Chat', 'Customers', 'Kpis', 'WeeklyPlan', 'Orders', 'Products', 'Retention', 'Reviews', 'Settings', 'StoreProducts', 'Team'], labFix: 'page-header' },
-  { id: 'F2', severity: 'P0', area: 'Data.tsx', title: '5 competing primary buttons on one page', detail: 'btn-primary appears 5× in Data & Sources (plus 4 in Tasks, 4 in IntegrationsPanel). A filled gold button should be THE action — one per view.', files: ['Data', 'Tasks', 'IntegrationsPanel', 'Products', 'QuickAdd', 'CouponsManager', 'Campaigns'], labFix: 'buttons' },
-  { id: 'F3', severity: 'P1', area: 'Global', title: 'Spacing anarchy — five competing rhythms', detail: 'Page containers use space-y-3/4/5/6/8 with no system: 16 pages use y-3, 15 use y-6, others scattered. Same-level cards use p-4/p-5/p-6 arbitrarily.', files: ['all pages'], labFix: 'tokens' },
-  { id: 'F4', severity: 'P1', area: 'Drawers/Report', title: 'Accent soup — up to 8 inline hues per surface', detail: 'OrderDrawer & Report carry 8 distinct hex colors, Chat/Retention 7. Status colors leak into decoration; semantic meaning drowns.', files: ['OrderDrawer', 'Report', 'Chat', 'Retention'], labFix: 'status' },
-  { id: 'F5', severity: 'P1', area: 'IntegrationsPanel', title: 'Last browser confirm() alive', detail: 'Disconnect still uses window.confirm at line 78 — every other destructive action migrated to the in-app dialog.', files: ['IntegrationsPanel'], labFix: undefined },
-  { id: 'F6', severity: 'P2', area: 'Customers', title: 'Ghost tokens — var(--gold), var(--gold-soft)', detail: 'Referenced but never defined in index.css. They silently render empty. Replace with --brand / --warning-soft.', files: ['Customers'], labFix: 'tokens' },
-  { id: 'F7', severity: 'P2', area: 'Modals', title: 'Glass modals over dark overlays = gray mud', detail: 'Fixed for picker/edit/playbook/confirm — the pattern is now codified here so it never regresses.', files: ['fixed'], labFix: 'modal' },
+const SHIPPED: ShippedFinding[] = [
+  { id: 'F1', title: '15 duplicate page titles stripped', detail: 'TopBar owns the title; pages speak through content.', shippedIn: 'Promotion pass 1' },
+  { id: 'F2', title: 'One primary button per view', detail: '11 demotions across Data, Tasks, Integrations, Products, Campaigns.', shippedIn: 'Promotion pass 1' },
+  { id: 'F3', title: 'Spacing rhythm codified', detail: 'pages space-y-6 · cards p-5 · rows py-3 — constitution published in tokens.', shippedIn: 'Promotion pass 1' },
+  { id: 'F4', title: 'Solid modal surfaces', detail: 'Glass-over-overlay gray mud eliminated in both themes.', shippedIn: 'UI reckoning' },
+  { id: 'F5', title: 'Browser confirms exterminated', detail: 'App-styled dialogs everywhere, including Disconnect.', shippedIn: 'Promotion pass 1' },
+  { id: 'F6', title: 'Ghost tokens buried', detail: 'var(--gold) and var(--gold-soft) replaced with real tokens.', shippedIn: 'Promotion pass 1' },
+  { id: 'F7', title: 'Sticky topbar + solid app bar', detail: 'Wrapper-pin fix below lg; content no longer ghosts through.', shippedIn: 'Navigation era' },
 ]
 
-const SEV_STYLE: Record<string, string> = {
-  P0: '#ef4444',
-  P1: '#f59e0b',
-  P2: '#64748b',
-}
+const INVENTIONS: { title: string; why: string; effort: string }[] = [
+  { title: 'Chat member palette curation', why: '18 ad-hoc hues to one curated 8-color identity set, calibrated for light and dark.', effort: 'S' },
+  { title: 'Goal gauge on Command Center', why: 'Monthly target to daily run-rate to a live gap arrow — the number that focuses everything.', effort: 'M' },
+  { title: 'Report print discipline', why: 'Near-monochrome ink ramp plus gold accents — the client-facing sheet deserves restraint.', effort: 'S' },
+  { title: 'Coupon ROI mini-chart', why: 'coupon.applied is live — renders rescued carts over time per code.', effort: 'M' },
+  { title: 'Keyboard command palette (v2)', why: 'QuickAdd exists; a full nav-plus-action palette is the power-user unlock.', effort: 'M' },
+  { title: 'Retention segment harmonization', why: 'Seven RFM identities into one saturation family with distinct hues.', effort: 'S' },
+]
 
 function SectionTitle({ icon: Icon, children }: { icon: typeof FlaskConical; children: React.ReactNode }) {
   return (
@@ -48,13 +41,6 @@ function SectionTitle({ icon: Icon, children }: { icon: typeof FlaskConical; chi
 
 export function Lab() {
   const [theme, setTheme] = useState<'light' | 'dark'>(document.documentElement.classList.contains('dark') ? 'dark' : 'light')
-  const [promoted, setPromoted] = useState<Set<string>>(new Set())
-
-  const counts = useMemo(() => ({
-    p0: FINDINGS.filter((f) => f.severity === 'P0').length,
-    p1: FINDINGS.filter((f) => f.severity === 'P1').length,
-    p2: FINDINGS.filter((f) => f.severity === 'P2').length,
-  }), [])
 
   return (
     <div className="space-y-8 max-w-5xl">
@@ -76,50 +62,57 @@ export function Lab() {
         </button>
       </div>
 
-      {/* Theme preview scope note */}
       <div className="rounded-xl border border-[var(--hairline)] bg-[var(--card)] px-4 py-3 text-xs text-[var(--text-muted)] flex items-center gap-2">
         <Info size={13} className="shrink-0" />
-        Components below render inside a preview frame in <b>{theme}</b> tokens — how they'll look promoted.
-        Full-page dark/light verification happens per promotion.
+        Sweep one is fully shipped (archive below). The register is clear — new findings and experiments land here.
       </div>
 
-      {/* ── 1. AUDIT FINDINGS */}
+      {/* Shipped archive */}
       <section>
-        <SectionTitle icon={AlertTriangle}>Audit sweep — {counts.p0} critical · {counts.p1} major · {counts.p2} minor</SectionTitle>
+        <SectionTitle icon={Check}>Shipped from the Lab — {SHIPPED.length} fixes living in production</SectionTitle>
         <div className="glass-card divide-y divide-[var(--hairline)] overflow-hidden">
-          {FINDINGS.map((f) => (
-            <div key={f.id} className="px-4 sm:px-5 py-3.5 flex items-start gap-3">
-              <span className="shrink-0 mt-0.5 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded"
-                style={{ color: SEV_STYLE[f.severity], background: `color-mix(in srgb, ${SEV_STYLE[f.severity]} 12%, transparent)` }}>
-                {f.severity}
+          {SHIPPED.map((f) => (
+            <div key={f.id} className="px-4 sm:px-5 py-3 flex items-start gap-3">
+              <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center bg-[var(--positive-soft)]">
+                <Check size={12} className="text-[var(--positive)]" />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-[var(--text-primary)]">{f.title}</div>
-                <div className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{f.detail}</div>
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {f.files.map((file) => (
-                    <span key={file} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--track)] text-[var(--text-muted)]">{file}</span>
-                  ))}
-                </div>
+                <div className="text-xs text-[var(--text-muted)] mt-0.5">{f.detail}</div>
               </div>
-              {f.labFix && (
-                <a href={`#lab-${f.labFix}`} className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium hover:underline" style={{ color: 'var(--brand)' }}>
-                  Fix pattern <ArrowRight size={11} />
-                </a>
-              )}
+              <span className="shrink-0 text-[10px] text-[var(--text-muted)] border border-[var(--hairline)] rounded px-1.5 py-0.5">{f.shippedIn}</span>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── 2. TOKEN SHEET */}
+      {/* Invention queue */}
+      <section>
+        <SectionTitle icon={Sparkles}>Invention queue — what I think we test next</SectionTitle>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {INVENTIONS.map((inv, i) => (
+            <div key={i} className="glass-card p-4 flex items-start gap-3">
+              <span className="shrink-0 mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--track)] text-[var(--text-muted)]">{inv.effort}</span>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-[var(--text-primary)]">{inv.title}</div>
+                <div className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{inv.why}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="text-[11px] text-[var(--text-muted)] mt-2">
+          Pick one — or say "all S items" — it gets prototyped here first, then promoted with proof.
+        </div>
+      </section>
+
+      {/* Tokens */}
       <section id="lab-tokens">
         <SectionTitle icon={Palette}>Design tokens — the constitution</SectionTitle>
         <div className="glass-card p-5 space-y-4">
           <p className="text-xs text-[var(--text-muted)]">
             One rhythm: pages <code className="px-1 rounded bg-[var(--track)]">space-y-6</code>, cards <code className="px-1 rounded bg-[var(--track)]">p-5</code>,
             rows <code className="px-1 rounded bg-[var(--track)]">py-3</code>. One accent: <b style={{ color: 'var(--brand)' }}>gold</b> for actions.
-            Semantic colors speak ONLY for status.
+            Semantic colors speak only for status.
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
@@ -145,60 +138,52 @@ export function Lab() {
           </div>
           <div className="flex items-center gap-2 text-xs">
             <Ruler size={13} className="text-[var(--text-muted)]" />
-            <span className="text-[var(--text-muted)]">Radii: cards 18 · controls 10 · chips full — already consistent, keep it.</span>
+            <span className="text-[var(--text-muted)]">Radii: cards 18 · controls 10 · chips full — consistent, keep it.</span>
           </div>
         </div>
       </section>
 
-      {/* ── 3. PATTERN: PAGE HEADER */}
+      {/* PageHeader pattern */}
       <section id="lab-page-header">
-        <SectionTitle icon={Type}>Pattern — PageHeader (kills 15 duplicate titles)</SectionTitle>
+        <SectionTitle icon={Type}>Pattern — PageHeader (shipped: 15 titles stripped)</SectionTitle>
         <div className="glass-card overflow-hidden">
           <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[var(--hairline)]">
             <div className="p-5">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-2">Current ✗</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-2">Before</div>
               <div className="space-y-2 opacity-80">
                 <div className="text-sm font-semibold">Cart Recovery <span className="text-[var(--text-muted)] font-normal">(TopBar)</span></div>
-                <div className="text-lg font-semibold text-[var(--text-primary)]">Cart Recovery <span className="text-[var(--text-muted)] font-normal text-sm">(page repeats it)</span></div>
-                <div className="text-sm font-semibold text-[var(--text-primary)]">Coupons <span className="text-[var(--text-muted)] font-normal text-xs">(tab repeats again)</span></div>
+                <div className="text-lg font-semibold text-[var(--text-primary)]">Cart Recovery <span className="text-[var(--text-muted)] font-normal text-sm">(page repeated it)</span></div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">Coupons <span className="text-[var(--text-muted)] font-normal text-xs">(tab repeated again)</span></div>
               </div>
             </div>
             <div className="p-5 border-l-2" style={{ borderColor: 'var(--brand)' }}>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">Proposed ✓</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">After</div>
               <div className="space-y-2">
                 <div className="text-sm font-semibold">Cart Recovery <span className="text-[var(--text-muted)] font-normal">(TopBar owns the title)</span></div>
-                <div className="text-sm text-[var(--text-muted)]">Page speaks only through <b className="text-[var(--text-primary)]">content</b>: one eyebrow + one metric line.</div>
+                <div className="text-sm text-[var(--text-muted)]">Pages speak through content: one metric line, no echo.</div>
               </div>
             </div>
-          </div>
-          <div className="px-5 pb-4 flex items-center justify-between gap-3 flex-wrap">
-            <span className="text-[11px] text-[var(--text-muted)]">Promote = strip 15 h2 blocks, add one PageHeader component. Targets listed in F1.</span>
-            <button onClick={() => setPromoted((s) => new Set(s).add('page-header'))}
-              className="btn btn-outline !text-xs !px-3 !py-1.5 inline-flex items-center gap-1.5">
-              {promoted.has('page-header') ? <><Check size={12} /> Approved (queued)</> : <>Approve for promotion</>}
-            </button>
           </div>
         </div>
       </section>
 
-      {/* ── 4. PATTERN: BUTTON HIERARCHY */}
+      {/* Button hierarchy pattern */}
       <section id="lab-buttons">
-        <SectionTitle icon={MousePointerClick}>Pattern — Button hierarchy (one filled per view)</SectionTitle>
+        <SectionTitle icon={MousePointerClick}>Pattern — Button hierarchy (shipped: 11 demotions)</SectionTitle>
         <div className="glass-card p-5 space-y-4">
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-2">Current ✗ — Data & Sources</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-2">Before — Data and Sources</div>
               <div className="flex flex-wrap gap-2">
                 <button className="btn btn-primary !text-xs !px-3 !py-1.5">Connect</button>
                 <button className="btn btn-primary !text-xs !px-3 !py-1.5">Sync all</button>
                 <button className="btn btn-primary !text-xs !px-3 !py-1.5">Import</button>
                 <button className="btn btn-primary !text-xs !px-3 !py-1.5">Save sheet</button>
-                <button className="btn btn-primary !text-xs !px-3 !py-1.5">Fetch</button>
               </div>
               <div className="text-[11px] text-[var(--text-muted)] mt-2">Five gold buttons = zero hierarchy.</div>
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">Proposed ✓</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">After</div>
               <div className="flex flex-wrap gap-2 items-center">
                 <button className="btn btn-primary !text-xs !px-3 !py-1.5">Sync now</button>
                 <button className="btn btn-outline !text-xs !px-3 !py-1.5">Connect platform</button>
@@ -208,22 +193,14 @@ export function Lab() {
               <div className="text-[11px] text-[var(--text-muted)] mt-2">One filled = the page's job. Outlines = choices. Ghost = tertiary.</div>
             </div>
           </div>
-          <div className="pt-3 border-t border-[var(--hairline)] flex items-center justify-between gap-3 flex-wrap">
-            <span className="text-[11px] text-[var(--text-muted)]">Rule: exactly ONE btn-primary per view. Everything else outline or ghost.</span>
-            <button onClick={() => setPromoted((s) => new Set(s).add('buttons'))}
-              className="btn btn-outline !text-xs !px-3 !py-1.5 inline-flex items-center gap-1.5">
-              {promoted.has('buttons') ? <><Check size={12} /> Approved</> : <>Approve for promotion</>}
-            </button>
-          </div>
         </div>
       </section>
 
-      {/* ── 5. PATTERN: STAT HERO */}
+      {/* StatHero pattern */}
       <section id="lab-stat-hero">
-        <SectionTitle icon={Layers}>Pattern — StatHero band (Command-Center DNA everywhere)</SectionTitle>
+        <SectionTitle icon={Layers}>Pattern — StatHero band (shipped in Cart Recovery)</SectionTitle>
         <div className="glass-card p-5">
-          <div className="rounded-xl border border-[var(--hairline)] bg-[var(--bg)] p-6 flex flex-wrap lg:flex-nowrap items-center gap-8"
-            style={{ filter: theme === 'dark' ? 'invert(0)' : undefined }}>
+          <div className="rounded-xl border border-[var(--hairline)] bg-[var(--bg)] p-6 flex flex-wrap lg:flex-nowrap items-center gap-8">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Pipeline value</div>
               <div className="text-5xl font-extrabold text-[var(--text-primary)] tabular-nums mt-1 leading-none">2,340 <span className="text-xl font-bold">SAR</span></div>
@@ -242,22 +219,18 @@ export function Lab() {
               </div>
             </div>
           </div>
-          <div className="pt-3 mt-3 border-t border-[var(--hairline)] flex items-center justify-between gap-3 flex-wrap">
-            <span className="text-[11px] text-[var(--text-muted)]">Live-proven in Cart Recovery. Next targets: Campaigns totals, Orders revenue, Retention LTV.</span>
-            <button onClick={() => setPromoted((s) => new Set(s).add('stat-hero'))}
-              className="btn btn-outline !text-xs !px-3 !py-1.5 inline-flex items-center gap-1.5">
-              {promoted.has('stat-hero') ? <><Check size={12} /> Approved</> : <>Approve for promotion</>}
-            </button>
+          <div className="pt-3 mt-3 border-t border-[var(--hairline)] text-[11px] text-[var(--text-muted)]">
+            Next targets: Campaigns totals, Orders revenue, Retention LTV.
           </div>
         </div>
       </section>
 
-      {/* ── 6. PATTERN: STATUS SEMANTICS */}
+      {/* Status semantics pattern */}
       <section id="lab-status">
-        <SectionTitle icon={AlertCircle}>Pattern — Status semantics (colors that mean something)</SectionTitle>
+        <SectionTitle icon={Palette}>Pattern — Status semantics (colors that mean something)</SectionTitle>
         <div className="glass-card p-5 grid md:grid-cols-2 gap-6">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-2">Never again ✗</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-2">Never again</div>
             <div className="flex flex-wrap gap-2">
               <span className="chip" style={{ background: '#8b5cf622', color: '#8b5cf6' }}>purple chip</span>
               <span className="chip" style={{ background: '#06b6d422', color: '#06b6d4' }}>cyan chip</span>
@@ -266,28 +239,23 @@ export function Lab() {
             </div>
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">The vocabulary ✓</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">The vocabulary</div>
             <div className="flex flex-wrap gap-2">
-              <span className="chip" style={{ background: 'rgba(16,185,129,.12)', color: '#10b981' }}>● live / done</span>
-              <span className="chip" style={{ background: 'rgba(245,158,11,.12)', color: '#f59e0b' }}>● warning / pending</span>
-              <span className="chip" style={{ background: 'rgba(239,68,68,.12)', color: '#ef4444' }}>● problem / overdue</span>
-              <span className="chip bg-[var(--track)] text-[var(--text-muted)]">● neutral / off</span>
+              <span className="chip" style={{ background: 'rgba(16,185,129,.12)', color: '#10b981' }}>live / done</span>
+              <span className="chip" style={{ background: 'rgba(245,158,11,.12)', color: '#f59e0b' }}>warning / pending</span>
+              <span className="chip" style={{ background: 'rgba(239,68,68,.12)', color: '#ef4444' }}>problem / overdue</span>
+              <span className="chip bg-[var(--track)] text-[var(--text-muted)]">neutral / off</span>
             </div>
           </div>
-          <div className="md:col-span-2 pt-3 border-t border-[var(--hairline)] flex items-center justify-between gap-3 flex-wrap">
-            <span className="text-[11px] text-[var(--text-muted)]">Domain palettes (order statuses, shipment states) keep their maps — but draw only from these four families.</span>
-            <button onClick={() => setPromoted((s) => new Set(s).add('status'))}
-              className="btn btn-outline !text-xs !px-3 !py-1.5 inline-flex items-center gap-1.5">
-              {promoted.has('status') ? <><Check size={12} /> Approved</> : <>Approve for promotion</>}
-            </button>
+          <div className="md:col-span-2 pt-3 border-t border-[var(--hairline)] text-[11px] text-[var(--text-muted)]">
+            Domain palettes (order statuses, shipment states) draw only from these four families.
           </div>
         </div>
       </section>
 
       {/* Footer */}
       <div className="glass-card px-5 py-4 text-xs text-[var(--text-muted)] leading-relaxed">
-        <b className="text-[var(--text-primary)]">How promotion works:</b> you approve patterns here → I implement them against their target files in a dedicated pass → each promotion ships with before/after screenshots → nothing touches production until you've seen it rendered.
-        The audit list above stays live — new findings land here first.
+        <b className="text-[var(--text-primary)]">How promotion works:</b> you approve patterns here → they are implemented against target files in a dedicated pass → each promotion ships with before/after screenshots → nothing touches production until you have seen it rendered.
       </div>
     </div>
   )
