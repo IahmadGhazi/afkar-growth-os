@@ -115,8 +115,6 @@ export function CartRecovery() {
   }, [carts, search])
 
   const potentialValue = carts.reduce((s, c) => s + c.cart_total, 0)
-  const hotCarts = carts.filter((c) => tempOf(c) === 'hot')
-  const contactedIds = new Set(carts.filter((c) => c.last_contacted_at).map((c) => c.id))
 
   // Coupon strength — YOU decide; the Brain advises per-row
   const [percent, setPercent] = useState(10)
@@ -285,43 +283,73 @@ export function CartRecovery() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">Cart Recovery</h2>
-        <div className="text-sm text-[var(--text-muted)]">
-          {carts.length} live carts · {potentialValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} SAR on the table
-          · <span className="text-[var(--positive)] font-medium">{rescuedCount} rescued</span> all-time
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Cart Recovery</h2>
+          <div className="text-sm text-[var(--text-muted)]">
+            {carts.length} live carts · <span className="text-[var(--positive)] font-medium">{rescuedCount} rescued</span> all-time
+          </div>
         </div>
       </div>
 
       <LiveBadge />
 
-      {/* Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger">
-        <div className="glass-card p-4 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(239,68,68,.1)' }}>
-            <Flame size={18} style={{ color: '#ef4444' }} />
-          </span>
-          <div>
-            <div className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{hotCarts.length}</div>
-            <div className="text-xs text-[var(--text-muted)]">Hot carts (&lt;1h old)</div>
+      {/* HERO — the number, the temperature map, the trophy */}
+      <div className="glass-card p-6">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-8">
+          <div className="min-w-[220px]">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Recoverable value</div>
+            <div className="text-5xl font-extrabold text-[var(--text-primary)] tabular-nums mt-1 leading-none">
+              {potentialValue.toLocaleString()} <span className="text-xl font-bold">SAR</span>
+            </div>
+            <div className="text-sm text-[var(--text-muted)] mt-2">
+              sitting in {carts.length} abandoned carts
+            </div>
           </div>
-        </div>
-        <div className="glass-card p-4 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-[var(--warning-soft)]">
-            <ShoppingCart size={18} className="text-[var(--warning)]" />
-          </span>
-          <div>
-            <div className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{potentialValue.toLocaleString()} <span className="text-sm">SAR</span></div>
-            <div className="text-xs text-[var(--text-muted)]">Recoverable value</div>
+
+          {/* Temperature value map */}
+          <div className="flex-1 min-w-[240px]">
+            {(() => {
+              const byTemp = { hot: 0, warm: 0, cold: 0 }
+              const counts = { hot: 0, warm: 0, cold: 0 }
+              for (const c of carts) { const t = tempOf(c); byTemp[t] += c.cart_total; counts[t]++ }
+              const total = byTemp.hot + byTemp.warm + byTemp.cold || 1
+              const seg = [
+                { t: 'hot' as Temp, color: '#ef4444', label: 'Hot <1h' },
+                { t: 'warm' as Temp, color: '#f59e0b', label: 'Warm <1d' },
+                { t: 'cold' as Temp, color: '#94a3b8', label: 'Cooling' },
+              ]
+              return (
+                <>
+                  <div className="flex h-3 rounded-full overflow-hidden bg-[var(--track)]">
+                    {seg.map((s) => byTemp[s.t] > 0 && (
+                      <div key={s.t} style={{ width: `${(byTemp[s.t] / total) * 100}%`, background: s.color }} title={`${s.label}: ${Math.round(byTemp[s.t]).toLocaleString()} SAR`} />
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3">
+                    {seg.map((s) => (
+                      <span key={s.t} className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                        <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+                        {s.label} · <span className="font-semibold text-[var(--text-primary)] tabular-nums">{Math.round(byTemp[s.t]).toLocaleString()}</span>
+                        <span className="opacity-60">({counts[s.t]})</span>
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
           </div>
-        </div>
-        <div className="glass-card p-4 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-[var(--positive-soft)]">
-            <Trophy size={18} className="text-[var(--positive)]" />
-          </span>
-          <div>
-            <div className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{contactedIds.size}</div>
-            <div className="text-xs text-[var(--text-muted)]">Already contacted</div>
+
+          {/* Trophy */}
+          <div className="flex items-center gap-3 lg:ml-auto lg:border-l lg:border-[var(--hairline)] lg:pl-8">
+            <span className="w-12 h-12 rounded-xl flex items-center justify-center bg-[var(--positive-soft)]">
+              <Trophy size={20} className="text-[var(--positive)]" />
+            </span>
+            <div>
+              <div className="text-2xl font-extrabold text-[var(--text-primary)] tabular-nums leading-none">{rescuedCount}</div>
+              <div className="text-xs text-[var(--text-muted)]">carts rescued</div>
+            </div>
           </div>
         </div>
       </div>
@@ -463,22 +491,17 @@ export function CartRecovery() {
                     )}
                   </div>
 
-                  {/* Money + actions */}
+                  {/* Money + actions — ONE coupon entry, one primary */}
                   <div className="flex items-center gap-2 ml-auto shrink-0">
                     <span className="text-base font-bold text-[var(--text-primary)] tabular-nums mr-1">
                       {Math.round(cart.cart_total).toLocaleString()} <span className="text-xs font-medium opacity-60">SAR</span>
                     </span>
                     {!armedCode && (
-                      <button onClick={() => onMint(cart)} disabled={minting.has(cart.id)}
-                        title={`Mint a ${effPercent}% / ${effHours >= 24 ? `${Math.round(effHours / 24)}d` : `${effHours}h`} coupon and attach it`}
-                        className="btn btn-outline !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5">
-                        <TicketPercent size={13} /> {minting.has(cart.id) ? '…' : `${effPercent}%`}
-                      </button>
-                    )}
-                    {!armedCode && activeCoupons.length > 0 && (
                       <button onClick={() => { setPickerCart(cart); setPickerSelected(null) }}
-                        title="Attach an existing coupon"
-                        className="btn btn-outline !px-3 !py-1.5 text-xs">Attach</button>
+                        title={`Coupon: mint ${effPercent}% or attach an existing one`}
+                        className="btn btn-outline !px-3 !py-1.5 text-xs inline-flex items-center gap-1.5">
+                        <TicketPercent size={13} /> Coupon
+                      </button>
                     )}
                     {cart.checkout_url && (
                       <a href={cart.checkout_url} target="_blank" rel="noopener noreferrer" title="Open checkout link"
@@ -512,7 +535,10 @@ export function CartRecovery() {
       </div>
 
       {/* ── PICKER: rich cards → select → confirm */}
-      {pickerCart && (
+      {pickerCart && (() => {
+        const effPercent = rowOverrides.get(pickerCart.id)?.percent ?? percent
+        const effHours = rowOverrides.get(pickerCart.id)?.hours ?? validHours
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/45 animate-[fadeIn_.2s_ease]" onClick={() => { setPickerCart(null); setPickerSelected(null) }} />
           <div className="relative glass-card p-5 w-full max-w-lg space-y-4 animate-[pulseIn_.3s_var(--ease-spring)_both] max-h-[85vh] overflow-y-auto">
@@ -524,6 +550,29 @@ export function CartRecovery() {
             </div>
 
             <div className="space-y-2">
+              {/* Mint-new — first card, uses toolbar strength or this row's Brain override */}
+              <button onClick={() => { const c = pickerCart; setPickerCart(null); setPickerSelected(null); void onMint(c) }}
+                disabled={minting.has(pickerCart.id)}
+                className="w-full text-left rounded-xl border px-4 py-3 transition-colors flex items-center gap-3"
+                style={{ borderColor: 'var(--brand)', background: 'var(--warning-soft)' }}>
+                <span className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 font-mono text-xs font-bold"
+                  style={{ background: 'var(--warning-soft)', color: 'var(--brand)', border: '1px dashed var(--brand)' }}>
+                  {effPercent}%
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-[var(--text-primary)]">
+                    {minting.has(pickerCart.id) ? 'Minting…' : `Mint a new ${effPercent}% coupon`}
+                  </span>
+                  <span className="block text-[11px] text-[var(--text-muted)] mt-0.5">
+                    Valid {effHours >= 24 ? `${Math.round(effHours / 24)} days` : `${effHours}h`} · private to this customer · attached automatically
+                  </span>
+                </span>
+                <TicketPercent size={16} style={{ color: 'var(--brand)' }} className="shrink-0" />
+              </button>
+
+              {activeCoupons.length > 0 && (
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] pt-1">or attach an existing one</div>
+              )}
               {activeCoupons.map((ac) => {
                 const selected = pickerSelected?.id === ac.id
                 return (
@@ -576,7 +625,8 @@ export function CartRecovery() {
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
