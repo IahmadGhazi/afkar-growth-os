@@ -233,7 +233,7 @@ function App() {
 
       {/* Main column */}
       <div className="flex-1 flex flex-col min-w-0 lg:h-screen">
-        <div className="print:hidden">
+        <div className="print:hidden sticky top-0 z-40">
           <TopBar
             title={pageTitles[currentPath] || 'Dashboard'}
             onQuickAdd={() => setQuickAddOpen(true)}

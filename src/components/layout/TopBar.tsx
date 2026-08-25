@@ -26,7 +26,7 @@ export function TopBar({ title, onQuickAdd, onNavigate, onMenuClick }: TopBarPro
   }
 
   return (
-    <header className="glass-strong mx-3 sm:mx-4 mt-3 sm:mt-4 mb-2 rounded-2xl h-14 sm:h-16 flex items-center justify-between gap-2 px-3 sm:px-5 shrink-0 sticky top-0 lg:static z-40">
+    <header className="glass-strong w-full mb-2 h-14 sm:h-16 flex items-center justify-between gap-2 px-3 sm:px-5 shrink-0 lg:w-auto lg:mx-3 lg:mt-3 lg:mb-2 lg:rounded-2xl">
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <button
           onClick={onMenuClick}
