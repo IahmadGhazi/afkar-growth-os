@@ -240,15 +240,23 @@ export async function onRequest(context: { request: Request; env: Record<string,
 
   // ---- SHIPMENTS ----
   try {
+    // FK shield: only link orders that actually exist — a shipment for an
+    // unknown/deleted order must not block the whole batch.
+    const ordRes = await fetch(`${env.SUPABASE_URL}/rest/v1/orders?client_id=eq.${clientId}&select=id`, {
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
+    })
+    const knownOrders = ordRes.ok ? new Set(((await ordRes.json()) as Array<{ id: string }>).map((o) => o.id)) : new Set()
+
     const rows: Array<Record<string, unknown>> = []
     let page = 1
     while (page <= 6) {
       const body = await sallaGet("/shipments", { page: String(page), per_page: "50" })
       const list = (body?.data ?? []) as any[]
       for (const s of list) {
+        const linkedOrder = s.order_id ? `ord_salla_${s.order_id}` : null
         rows.push({
           id: `shp_salla_${s.id}`, client_id: clientId,
-          order_id: s.order_id ? `ord_salla_${s.order_id}` : null,
+          order_id: linkedOrder && knownOrders.has(linkedOrder) ? linkedOrder : null,
           salla_shipment_id: s.id,
           status: typeof s.status === "string" ? s.status : (s.status?.slug ?? "created"),
           shipping_company: s.shipping_company?.name ?? s.courier?.name ?? null,

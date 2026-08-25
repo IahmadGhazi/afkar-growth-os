@@ -291,9 +291,17 @@ export async function onRequest(context: { request: Request; env: Record<string,
       case "order.shipment.creating":
       case "shipment.status.updated": {
         const ship = data as Record<string, any>
+        // FK shield: link only if the order exists here; never block a shipment
+        let linkedOrderId: string | null = null
+        if (ship.order_id) {
+          const ordCheck = await fetch(`${env.SUPABASE_URL}/rest/v1/orders?id=eq.ord_salla_${ship.order_id}&select=id`, { headers: GET })
+          if (ordCheck.ok && ((await ordCheck.json()) as Array<{ id: string }>).length) {
+            linkedOrderId = `ord_salla_${ship.order_id}`
+          }
+        }
         await upsert("shipments", {
           id: `shp_salla_${ship.id}`, client_id: clientId,
-          order_id: ship.order_id ? `ord_salla_${ship.order_id}` : null,
+          order_id: linkedOrderId,
           salla_shipment_id: ship.id,
           status: statusOf(ship.status),
           shipping_company: ship.shipping_company?.name ?? ship.company?.name ?? null,
@@ -307,9 +315,16 @@ export async function onRequest(context: { request: Request; env: Record<string,
       case "shipment.cancelled":
       case "order.shipment.cancelled": {
         const ship = data as Record<string, any>
+        let linkedOrderId2: string | null = null
+        if (ship.order_id) {
+          const ordCheck2 = await fetch(`${env.SUPABASE_URL}/rest/v1/orders?id=eq.ord_salla_${ship.order_id}&select=id`, { headers: GET })
+          if (ordCheck2.ok && ((await ordCheck2.json()) as Array<{ id: string }>).length) {
+            linkedOrderId2 = `ord_salla_${ship.order_id}`
+          }
+        }
         await upsert("shipments", {
           id: `shp_salla_${ship.id}`, client_id: clientId,
-          order_id: ship.order_id ? `ord_salla_${ship.order_id}` : null,
+          order_id: linkedOrderId2,
           salla_shipment_id: ship.id, status: "cancelled",
           tracking_number: ship.tracking_number ?? null, updated_at: now,
         })
