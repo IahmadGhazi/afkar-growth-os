@@ -64,17 +64,21 @@ function VerdictButtons({ n, verdicts, set }: { n: number; verdicts: Record<numb
 function ProtoShell({ p, verdicts, set, children }: { p: Proto; verdicts: Record<number, Verdict>; set: (n: number, v: Verdict) => void; children: React.ReactNode }) {
   const v = verdicts[p.n] ?? 'none'
   return (
-    <div className="glass-card overflow-hidden" style={v === 'approved' ? { borderColor: 'var(--brand)', boxShadow: '0 0 0 1px var(--brand)' } : v === 'skipped' ? { opacity: 0.55 } : undefined}>
-      <div className="px-5 pt-4 pb-3 flex items-start gap-3 flex-wrap">
-        <span className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-sm font-bold shrink-0"
-          style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}>{p.n}</span>
+    <div className="glass-card overflow-hidden relative" style={v === 'approved' ? { borderColor: 'var(--brand)', boxShadow: '0 0 0 1px var(--brand)' } : v === 'skipped' ? { opacity: 0.55 } : undefined}>
+      {/* gold hairline — quiet luxury */}
+      <span aria-hidden className="absolute top-0 left-0 right-0 h-[2px]"
+        style={{ background: 'linear-gradient(90deg, var(--brand), transparent 70%)' }} />
+      <div className="px-5 pt-4 pb-3 flex items-start gap-4 flex-wrap">
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-bold text-[var(--text-primary)]">{p.title}</div>
-          <div className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{p.why}</div>
-          <div className="flex gap-1.5 mt-1.5 flex-wrap">
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--track)] text-[var(--text-muted)]">effort {p.effort}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--track)] text-[var(--text-muted)]">{p.targets}</span>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[10px] font-semibold tracking-[0.22em] uppercase" style={{ color: 'var(--brand)' }}>
+              Prototype {String(p.n).padStart(2, '0')}
+            </span>
+            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">effort {p.effort}</span>
+            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">{p.targets}</span>
           </div>
+          <div className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)] mt-1">{p.title}</div>
+          <div className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed max-w-2xl">{p.why}</div>
         </div>
         <VerdictButtons n={p.n} verdicts={verdicts} set={set} />
       </div>
@@ -210,22 +214,37 @@ export function Lab() {
 
       {/* ── P3 REPORT PRINT */}
       <ProtoShell p={PROTOS[2]} verdicts={verdicts} set={set}>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="rounded-lg border border-[var(--hairline)] bg-white p-4">
-            <div className="text-[10px] font-semibold uppercase text-[#ef4444] mb-2">Current — 8 hues on paper</div>
-            <div className="space-y-1.5 text-[13px]" style={{ color: '#171a21' }}>
-              <div>Revenue <b style={{ color: '#0fa96c' }}>+81%</b> · Spend <b style={{ color: '#dd5a5a' }}>+0%</b></div>
-              <div>ROAS <b style={{ color: '#c8920b' }}>25.9x</b> · CAC <b style={{ color: '#e0902e' }}>12.6</b></div>
-              <div className="text-[11px]" style={{ color: '#969eab' }}>Two greens, two reds, two ambers…</div>
+        <div className="space-y-4">
+          <div className="rounded-lg border border-[var(--hairline)] bg-[var(--card)] p-4">
+            <div className="text-[10px] font-semibold uppercase text-[#ef4444] mb-2">Current — 8 hues, paper-only thinking</div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="rounded-lg bg-white p-3 text-[13px]" style={{ color: '#171a21' }}>
+                Revenue <b style={{ color: '#0fa96c' }}>+81%</b> · Spend <b style={{ color: '#dd5a5a' }}>±0%</b><br />
+                ROAS <b style={{ color: '#c8920b' }}>25.9x</b> · CAC <b style={{ color: '#e0902e' }}>12.6</b>
+              </div>
+              <div className="rounded-lg bg-white p-3 text-[13px]" style={{ color: '#171a21' }}>
+                Blinding in dark mode. Two greens, two reds, two ambers on one sheet.
+              </div>
             </div>
           </div>
-          <div className="rounded-lg border border-[var(--hairline)] bg-white p-4">
-            <div className="text-[10px] font-semibold uppercase text-[var(--positive)] mb-2">Proposed — ink + gold</div>
-            <div className="space-y-1.5 text-[13px]" style={{ color: '#171a21' }}>
-              <div>Revenue <b style={{ color: '#0fa96c' }}>+81%</b> · Spend <b>±0%</b></div>
-              <div>ROAS <b style={{ color: '#c8920b' }}>25.9x</b> · CAC <b>12.6</b></div>
-              <div className="text-[11px]" style={{ color: '#565d6b' }}>One green, one gold, ink for the rest — print-calm.</div>
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">Proposed — one design, two contexts</div>
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Screen · dark */}
+              <div className="rounded-lg border border-[var(--hairline)] p-3 text-[13px]"
+                style={{ background: 'var(--card)', color: 'var(--text-primary)' }}>
+                <div className="text-[9px] uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Screen · adapts to theme</div>
+                Revenue <b style={{ color: '#34d399' }}>+81%</b> · Spend <b style={{ color: 'var(--text-muted)' }}>±0%</b><br />
+                ROAS <b style={{ color: 'var(--brand)' }}>25.9x</b> · CAC <b>12.6</b>
+              </div>
+              {/* Print · paper */}
+              <div className="rounded-lg bg-white p-3 text-[13px]" style={{ color: '#171a21' }}>
+                <div className="text-[9px] uppercase tracking-wider mb-1.5" style={{ color: '#969eab' }}>Print · paper</div>
+                Revenue <b style={{ color: '#0fa96c' }}>+81%</b> · Spend <b>±0%</b><br />
+                ROAS <b style={{ color: '#c8920b' }}>25.9x</b> · CAC <b>12.6</b>
+              </div>
             </div>
+            <div className="text-[11px] text-[var(--text-muted)] mt-2">Screen follows the theme. Print stays ink + one green + gold. Nothing blinding, ever.</div>
           </div>
         </div>
       </ProtoShell>
@@ -291,13 +310,13 @@ export function Lab() {
             </div>
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">Proposed — one family, distinct hues</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--positive)] mb-2">Proposed — one family, dark-proof lightness</div>
             <div className="flex flex-wrap gap-2">
-              {[['Champions', '#b8860b'], ['Loyal', '#9a7b0a'], ['Promising', '#7a6d9e'], ['New', '#4a8fa8'], ['One-time', '#64748b'], ['At Risk', '#b8742a'], ['Dormant', '#8a5a5a']].map(([l, c]: any) => (
-                <span key={l} className="chip text-xs" style={{ color: c, background: `${c}18`, borderColor: `${c}40` }}>{l}</span>
+              {[['Champions', '#d1a327'], ['Loyal', '#4d8de0'], ['Promising', '#927fe0'], ['New', '#3fa66c'], ['One-time', '#7c8aa0'], ['At Risk', '#dfa640'], ['Dormant', '#d97b6c']].map(([l, c]: any) => (
+                <span key={l} className="chip text-xs" style={{ color: c, background: `${c}1f`, borderColor: `${c}45` }}>{l}</span>
               ))}
             </div>
-            <div className="text-[11px] text-[var(--text-muted)] mt-2">Muted, equal saturation — the set reads as one system.</div>
+            <div className="text-[11px] text-[var(--text-muted)] mt-2">Same saturation, mid-lightness — every hue survives light AND dark.</div>
           </div>
         </div>
       </ProtoShell>
