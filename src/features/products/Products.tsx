@@ -96,18 +96,21 @@ function ProductCard({
   const next = NEXT_STAGE[product.status]
   const isKilled = product.status === 'killed'
 
-  // LIVE PREVIEW: match this candidate to its real product in the Salla store
+  // LIVE PREVIEW: manual link wins, then auto-match by name
+  const salla = state.sallaProducts ?? []
+  const linked = product.store_product_id ? salla.find((sp) => sp.id === product.store_product_id) ?? null : null
   const storeMatch = useMemo(() => {
+    if (linked) return linked
     const words = product.name.toLowerCase().split(/\s+/).filter((w) => w.length >= 3)
     if (!words.length) return null
-    let best: { p: typeof state.sallaProducts[number]; score: number } | null = null
-    for (const sp of state.sallaProducts ?? []) {
+    let best: { p: typeof salla[number]; score: number } | null = null
+    for (const sp of salla) {
       const n = sp.name.toLowerCase()
       const s = words.reduce((acc, w) => acc + (n.includes(w) ? w.length : 0), 0)
       if (s > 0 && (!best || s > best.score)) best = { p: sp, score: s }
     }
     return best && best.score >= 3 ? best.p : null
-  }, [product.name, state.sallaProducts])
+  }, [linked, product.name, salla])
 
   return (
     <div className="glass-card hover-lift p-4 flex flex-col gap-3">
@@ -124,6 +127,13 @@ function ProductCard({
               style={{ background: 'rgba(16,185,129,.9)', color: '#04120c' }}>
               live on your store
             </span>
+            {product.store_product_id && (
+              <button onClick={() => actions.updateProduct(product.id, { store_product_id: null })}
+                aria-label="Unlink store product" title="Unlink"
+                className="absolute top-2 right-2 p-1 rounded bg-black/45 text-white/85 hover:text-white transition-colors">
+                <X size={11} />
+              </button>
+            )}
           </div>
           <div className="px-3 py-2 bg-[var(--card)] flex items-center justify-between gap-2">
             <span className="text-[11px] text-[var(--text-muted)] truncate" dir="auto">{storeMatch.name}</span>
@@ -132,6 +142,20 @@ function ProductCard({
             </span>
           </div>
         </div>
+      )}
+      {!storeMatch && salla.length > 0 && (
+        <select
+          value=""
+          onChange={(e) => { if (e.target.value) actions.updateProduct(product.id, { store_product_id: e.target.value }) }}
+          aria-label="Link a store product"
+          className="field !py-1.5 !text-xs text-[var(--text-muted)]"
+          title="Link this candidate to its live product — photo + real sales appear here"
+        >
+          <option value="">🔗 Link store product…</option>
+          {salla.map((sp) => (
+            <option key={sp.id} value={sp.id}>{sp.name}</option>
+          ))}
+        </select>
       )}
 
       <div className="flex items-start justify-between gap-2">

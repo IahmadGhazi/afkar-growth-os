@@ -428,6 +428,8 @@ export interface ProductCandidate {
   score_margin: number | null
   score_creative: number | null
   score_brand_fit: number | null
+  /** Linked live product in the Salla store (manual or auto-matched). */
+  store_product_id?: string | null
   score_trend: number | null
   status: ProductStatus
   decision_notes: string | null
