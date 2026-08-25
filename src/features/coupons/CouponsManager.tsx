@@ -42,6 +42,59 @@ function doctrine(percent: number): string {
   return 'Margin burner — above 25% needs a strategic reason (clearance, win-back war). Use sparingly.'
 }
 
+/** ROI strip — rescued carts & SAR by week, computed from live cart data. */
+function RoiStrip() {
+  const { state } = useApp()
+  const rescued = useMemo(
+    () => (state.abandonedCarts ?? []).filter((c) => c.status === 'purchased'),
+    [state.abandonedCarts],
+  )
+  const recovered = rescued.reduce((s, c) => s + c.cart_total, 0)
+
+  const weeks = useMemo(() => {
+    const buckets = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date()
+      d.setDate(d.getDate() - i * 7)
+      const end = d.getTime()
+      const start = end - 7 * 86_400_000
+      return { start, end, count: 0, sar: 0 }
+    }).reverse()
+    for (const c of rescued) {
+      const t = new Date(c.updated_at).getTime()
+      const b = buckets.find((x) => t >= x.start && t < x.end)
+      if (b) { b.count++; b.sar += c.cart_total }
+    }
+    return buckets
+  }, [rescued])
+
+  const max = Math.max(...weeks.map((w) => w.sar), 1)
+  if (rescued.length === 0) return null
+
+  return (
+    <div className="glass-card p-5 flex flex-wrap items-center gap-8">
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Recovered by coupons</div>
+        <div className="text-4xl font-extrabold text-[var(--text-primary)] tabular-nums mt-1">
+          {Math.round(recovered).toLocaleString()} <span className="text-lg font-bold">SAR</span>
+        </div>
+        <div className="text-xs text-[var(--text-muted)] mt-1">{rescued.length} carts rescued all-time</div>
+      </div>
+      <div className="flex-1 min-w-[220px]">
+        <div className="flex items-end gap-2 h-20">
+          {weeks.map((w, i) => (
+            <div key={i} className="flex-1 rounded-t-md transition-all"
+              style={{ height: `${Math.max(4, (w.sar / max) * 100)}%`, background: i === weeks.length - 1 ? 'var(--brand)' : 'var(--track)' }}
+              title={`${Math.round(w.sar).toLocaleString()} SAR · ${w.count} carts`} />
+          ))}
+        </div>
+        <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
+          <span>6w ago</span><span className="font-semibold" style={{ color: 'var(--brand)' }}>this week</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function CouponsManager() {
   const { state, actions } = useApp()
   const [coupons, setCoupons] = useState<SallaCoupon[] | null>(null)
@@ -316,6 +369,9 @@ export function CouponsManager() {
           {error}
         </div>
       )}
+
+      {/* ROI — rescued carts, the proof the coupons earn */}
+      <RoiStrip />
 
       {/* List */}
       {coupons === null && !error ? (

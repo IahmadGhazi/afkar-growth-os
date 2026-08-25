@@ -31,6 +31,7 @@ import { Settings } from './features/settings/Settings'
 import { Report } from './features/report/Report'
 import { NotificationsPanel } from './components/notifications/NotificationsPanel'
 import { AppConfirm } from './components/shared/Confirm'
+import { PageFade } from './components/ui'
 
 const pageTitles: Record<string, string> = {
   '/': 'Command Center',
@@ -243,13 +244,19 @@ function App() {
         </div>
         <main
           key={currentPath}
-          className="flex-1 overflow-y-auto px-4 pb-8 sm:px-5 lg:px-5 lg:pb-8 page-enter print:overflow-visible print:p-0 print:animate-none"
+          className="flex-1 overflow-y-auto px-4 pb-8 sm:px-5 lg:px-5 lg:pb-8 print:overflow-visible print:p-0"
         >
-          <div className="max-w-[1440px] mx-auto">{renderPage()}</div>
+          <div className="max-w-[1440px] mx-auto">
+            <PageFade routeKey={currentPath}>{renderPage()}</PageFade>
+          </div>
         </main>
       </div>
 
-      <QuickAdd open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
+          <QuickAdd
+            open={quickAddOpen}
+            onClose={() => setQuickAddOpen(false)}
+            onNavigate={navigate}
+          />
       <NotificationsPanel
         open={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}

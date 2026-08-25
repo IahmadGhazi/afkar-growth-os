@@ -287,7 +287,7 @@ export function Report() {
                   )}
                 </div>
                 <div className="rounded-xl border border-[rgba(22,26,34,0.1)] p-4">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#dd5a5a] mb-2">! Needs attention</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#33373f] mb-2">! Needs attention</div>
                   {attention.length === 0 ? (
                     <p className="text-sm text-[#969eab]">Everything is on track.</p>
                   ) : (
@@ -318,7 +318,7 @@ export function Report() {
                 <div key={kpi.id} className="bg-white p-3.5">
                   <div className="text-xs text-[#969eab]">{kpi.name}</div>
                   <div className="text-lg font-bold mt-0.5">{format(kpi.current)}</div>
-                  <div className={`text-xs font-medium ${change ? (good ? 'text-[#0fa96c]' : 'text-[#dd5a5a]') : 'text-[#969eab]'}`}>
+                  <div className={`text-xs font-medium ${change ? (good ? 'text-[#0fa96c]' : 'text-[#33373f]') : 'text-[#969eab]'}`}>
                     {change ? `${change} vs last week` : 'No history yet'}
                   </div>
                 </div>
@@ -400,8 +400,8 @@ export function Report() {
             {[
               { label: 'Done', value: doneThisWeek, tone: '#0fa96c' },
               { label: 'Awaiting review', value: reviewTasks.length, tone: '#c8920b' },
-              { label: 'Blocked', value: blockedTasks.length, tone: '#dd5a5a' },
-              { label: 'Overdue', value: overdueTasks.length, tone: '#e0902e' },
+              { label: 'Blocked', value: blockedTasks.length, tone: '#33373f' },
+              { label: 'Overdue', value: overdueTasks.length, tone: '#c8920b' },
             ].map((item) => (
               <div key={item.label} className="rounded-xl border border-[rgba(22,26,34,0.1)] p-3">
                 <div className="text-xl font-bold" style={{ color: item.tone }}>{item.value}</div>
@@ -443,7 +443,7 @@ export function Report() {
                 <div className="h-1.5 bg-[rgba(22,26,34,0.08)] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full"
-                    style={{ width: `${dept.percentage}%`, backgroundColor: dept.percentage >= 70 ? '#c8920b' : '#e0902e' }}
+                    style={{ width: `${dept.percentage}%`, backgroundColor: dept.percentage >= 70 ? '#c8920b' : '#c8920b' }}
                   />
                 </div>
               </div>
@@ -475,8 +475,8 @@ export function Report() {
                           backgroundColor:
                             kr.status === 'achieved' ? '#0fa96c'
                             : kr.status === 'on_track' ? '#c8920b'
-                            : kr.status === 'at_risk' ? '#e0902e'
-                            : '#dd5a5a',
+                            : kr.status === 'at_risk' ? '#c8920b'
+                            : '#33373f',
                         }}
                       />
                       <span className="text-[#33373f]">{kr.title}</span>

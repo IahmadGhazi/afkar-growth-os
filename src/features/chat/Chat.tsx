@@ -9,14 +9,15 @@ const QUICK_REACTIONS = ['👍', '🎉', '❤️', '😄', '👀']
 /** Unique identity color per department. Instant visual recognition:
     you know who's who before reading a single name. */
 const DEPARTMENT_STYLE: Record<string, { grad: string; text: string; name: string }> = {
-  super_admin:      { grad: 'from-[#f0c42e] to-[#d29a0c]', text: '#1a1405', name: '#d29a0c' },
-  account_manager:  { grad: 'from-[#f0c42e] to-[#b8930a]', text: '#1a1405', name: '#c9950b' },
-  seo:              { grad: 'from-[#34d399] to-[#0fa96c]', text: '#ffffff', name: '#0fa96c' },
-  media_buyer:      { grad: 'from-[#818cf8] to-[#6366f1]', text: '#ffffff', name: '#6366f1' },
-  social_media:     { grad: 'from-[#f472b6] to-[#ec4899]', text: '#ffffff', name: '#ec4899' },
-  designer:         { grad: 'from-[#fb923c] to-[#f97316]', text: '#ffffff', name: '#f97316' },
-  product_research: { grad: 'from-[#2dd4bf] to-[#14b8a6]', text: '#ffffff', name: '#14b8a6' },
-  viewer:           { grad: 'from-[#94a3b8] to-[#64748b]', text: '#ffffff', name: '#64748b' },
+  /* Identity family — one saturation band, mid-lightness, dark-proof. Gold = command. */
+  super_admin:      { grad: 'from-[#e0b234] to-[#c9950b]', text: '#1a1405', name: '#d29a0c' },
+  account_manager:  { grad: 'from-[#c9a94a] to-[#a8841c]', text: '#1a1405', name: '#a8841c' },
+  seo:              { grad: 'from-[#4db87e] to-[#3fa66c]', text: '#0d1f14', name: '#3fa66c' },
+  media_buyer:      { grad: 'from-[#6ba3e8] to-[#4d8de0]', text: '#0d1420', name: '#4d8de0' },
+  social_media:     { grad: 'from-[#e287b4] to-[#d9679b]', text: '#200d16', name: '#d9679b' },
+  designer:         { grad: 'from-[#e89a5e] to-[#e0854a]', text: '#20100a', name: '#e0854a' },
+  product_research: { grad: 'from-[#43b2c9] to-[#2a9db5]', text: '#0a1a1f', name: '#2a9db5' },
+  viewer:           { grad: 'from-[#8d9aac] to-[#7c8aa0]', text: '#10141b', name: '#7c8aa0' },
 }
 
 function deptStyle(profile: Profile | undefined) {

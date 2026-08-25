@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Plus,
   Pencil,
@@ -96,8 +96,44 @@ function ProductCard({
   const next = NEXT_STAGE[product.status]
   const isKilled = product.status === 'killed'
 
+  // LIVE PREVIEW: match this candidate to its real product in the Salla store
+  const storeMatch = useMemo(() => {
+    const words = product.name.toLowerCase().split(/\s+/).filter((w) => w.length >= 3)
+    if (!words.length) return null
+    let best: { p: typeof state.sallaProducts[number]; score: number } | null = null
+    for (const sp of state.sallaProducts ?? []) {
+      const n = sp.name.toLowerCase()
+      const s = words.reduce((acc, w) => acc + (n.includes(w) ? w.length : 0), 0)
+      if (s > 0 && (!best || s > best.score)) best = { p: sp, score: s }
+    }
+    return best && best.score >= 3 ? best.p : null
+  }, [product.name, state.sallaProducts])
+
   return (
     <div className="glass-card hover-lift p-4 flex flex-col gap-3">
+      {/* Live store preview — the real photo + real performance */}
+      {storeMatch && (
+        <div className="rounded-xl overflow-hidden border border-[var(--hairline)]">
+          <div className="relative">
+            {storeMatch.image_url ? (
+              <img src={storeMatch.image_url} alt={storeMatch.name} className="w-full h-36 object-cover" loading="lazy" />
+            ) : (
+              <div className="w-full h-20 flex items-center justify-center bg-[var(--track)] text-xs text-[var(--text-muted)]">no photo</div>
+            )}
+            <span className="absolute top-2 left-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+              style={{ background: 'rgba(16,185,129,.9)', color: '#04120c' }}>
+              live on your store
+            </span>
+          </div>
+          <div className="px-3 py-2 bg-[var(--card)] flex items-center justify-between gap-2">
+            <span className="text-[11px] text-[var(--text-muted)] truncate" dir="auto">{storeMatch.name}</span>
+            <span className="text-[11px] font-semibold text-[var(--text-primary)] shrink-0 tabular-nums">
+              {storeMatch.sales_count} sold{storeMatch.rating_avg ? ` · ${storeMatch.rating_avg.toFixed(1)}★` : ''}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-start justify-between gap-2">
         <div className="font-semibold text-[var(--text-primary)] leading-snug">{product.name}</div>
         {score != null && !isKilled && (

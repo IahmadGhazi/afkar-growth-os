@@ -42,6 +42,7 @@ import {
 } from '../../lib/insights'
 import { SectionTitle } from '../../components/shared/ui'
 import { StorePulse } from '../pulse/StorePulse'
+import { GoalGauge } from './GoalGauge'
 import { formatFull } from '../../lib/date'
 import type { DataSourceId } from '../../types/database'
 
@@ -287,6 +288,9 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
           )
         })()}
       </section>
+
+      {/* Goal gauge — monthly target vs live run-rate */}
+      <GoalGauge />
 
       {/* Key metrics — everything else, dense and scannable by department */}
       <section>

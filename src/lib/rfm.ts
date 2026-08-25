@@ -17,13 +17,14 @@ export interface Segment {
 }
 
 export const SEGMENTS: Record<SegmentId, Segment> = {
-  champion: { id: 'champion', label: 'Champions', hint: 'Buy often, recently, big baskets', color: '#d29a0c' },
-  loyal: { id: 'loyal', label: 'Loyal', hint: 'Repeat buyers who keep coming back', color: '#3b82f6' },
-  promising: { id: 'promising', label: 'Promising', hint: 'Good spenders warming up', color: '#8b5cf6' },
-  new: { id: 'new', label: 'New', hint: 'First order in the last 14 days', color: '#10b981' },
-  one_time: { id: 'one_time', label: 'One-time', hint: 'Single purchase so far', color: '#64748b' },
-  at_risk: { id: 'at_risk', label: 'At Risk', hint: 'Were active — went quiet', color: '#f59e0b' },
-  dormant: { id: 'dormant', label: 'Dormant', hint: 'No orders in a long time', color: '#ef4444' },
+  /* One saturation family, mid-lightness — every hue survives light AND dark */
+  champion: { id: 'champion', label: 'Champions', hint: 'Buy often, recently, big baskets', color: '#d1a327' },
+  loyal: { id: 'loyal', label: 'Loyal', hint: 'Repeat buyers who keep coming back', color: '#4d8de0' },
+  promising: { id: 'promising', label: 'Promising', hint: 'Good spenders warming up', color: '#927fe0' },
+  new: { id: 'new', label: 'New', hint: 'First order in the last 14 days', color: '#3fa66c' },
+  one_time: { id: 'one_time', label: 'One-time', hint: 'Single purchase so far', color: '#7c8aa0' },
+  at_risk: { id: 'at_risk', label: 'At Risk', hint: 'Were active — went quiet', color: '#dfa640' },
+  dormant: { id: 'dormant', label: 'Dormant', hint: 'No orders in a long time', color: '#d97b6c' },
 }
 
 export interface CustomerIntel {

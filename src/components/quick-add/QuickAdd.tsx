@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Plus, CheckSquare, BarChart3, Users, X } from 'lucide-react'
-import { useApp, type TaskInput, type KpiInput, type MemberInput } from '../../lib/store'
+import { useMemo, useState } from 'react'
+import { Plus, CheckSquare, BarChart3, Users, X, Command, RefreshCw, Search, ShoppingCart, FileText, Sunrise, MessageSquare, Package, Star, HeartPulse, Database, Store as StoreIcon, Rocket, Settings as SettingsIcon, LayoutDashboard, Users2, Target, ShoppingBag } from 'lucide-react'
+import { useApp, refreshFromServer, type TaskInput, type KpiInput, type MemberInput } from '../../lib/store'
+import { supabase } from '../../lib/supabase'
 import { DEPARTMENT_LABELS, roleLabel } from '../../lib/selectors'
 import type { Department, Profile } from '../../types/database'
 
@@ -12,9 +13,32 @@ const tabs: { id: Tab; label: string; icon: typeof Plus }[] = [
   { id: 'member', label: 'Member', icon: Users },
 ]
 
+const ROUTES: { name: string; path: string; icon: typeof Plus }[] = [
+  { name: 'Command Center', path: '/', icon: LayoutDashboard },
+  { name: 'Morning Briefing', path: '/briefing', icon: Sunrise },
+  { name: 'My Work', path: '/my-work', icon: CheckSquare },
+  { name: 'Weekly Plan', path: '/weekly-plan', icon: Target },
+  { name: 'Tasks', path: '/tasks', icon: CheckSquare },
+  { name: 'Team Chat', path: '/chat', icon: MessageSquare },
+  { name: 'Members', path: '/team', icon: Users2 },
+  { name: 'Product Research', path: '/products', icon: Package },
+  { name: 'Products', path: '/store-products', icon: StoreIcon },
+  { name: 'Cart Recovery', path: '/carts', icon: ShoppingCart },
+  { name: 'Orders', path: '/orders', icon: ShoppingBag },
+  { name: 'Customers', path: '/customers', icon: Users2 },
+  { name: 'Reviews', path: '/reviews', icon: Star },
+  { name: 'Retention', path: '/retention', icon: HeartPulse },
+  { name: 'Campaigns', path: '/campaigns', icon: Rocket },
+  { name: 'KPIs', path: '/kpis', icon: BarChart3 },
+  { name: 'Client Report', path: '/report', icon: FileText },
+  { name: 'Data & Sources', path: '/data', icon: Database },
+  { name: 'Settings', path: '/settings', icon: SettingsIcon },
+]
+
 interface QuickAddProps {
   open: boolean
   onClose: () => void
+  onNavigate?: (path: string) => void
 }
 
 const roles: Profile['role'][] = [
@@ -27,9 +51,31 @@ const roles: Profile['role'][] = [
   'viewer',
 ]
 
-export function QuickAdd({ open, onClose }: QuickAddProps) {
+export function QuickAdd({ open, onClose, onNavigate }: QuickAddProps) {
   const { state, actions } = useApp()
   const [tab, setTab] = useState<Tab>('task')
+  const [query, setQuery] = useState('')
+  const [syncing, setSyncing] = useState(false)
+
+  const routeHits = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return []
+    return ROUTES.filter((r) => r.name.toLowerCase().includes(q)).slice(0, 5)
+  }, [query])
+
+  const go = (path: string) => { onNavigate?.(path); onClose(); setQuery('') }
+
+  const syncSalla = async () => {
+    setSyncing(true)
+    try {
+      const { data } = await supabase!.auth.getSession()
+      await fetch('/api/salla/sync', { method: 'POST', headers: { Authorization: `Bearer ${data.session?.access_token}` } })
+      await refreshFromServer()
+    } catch { /* toast lives in caller paths */ }
+    setSyncing(false)
+    onClose(); setQuery('')
+  }
+
 
   const [task, setTask] = useState<TaskInput>({
     title: '',
@@ -82,10 +128,54 @@ export function QuickAdd({ open, onClose }: QuickAddProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 pt-4">
-          <span className="font-semibold text-[var(--text-primary)]">Quick Add</span>
+          <span className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
+            <Command size={15} style={{ color: 'var(--brand)' }} /> Command
+          </span>
           <button onClick={close} className="icon-btn" aria-label="Close">
             <X size={16} />
           </button>
+        </div>
+
+        {/* Command bar — navigate + act */}
+        <div className="px-5 pt-4 space-y-2">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && routeHits.length) go(routeHits[0].path)
+                if (e.key === 'Escape') { onClose(); setQuery('') }
+              }}
+              placeholder="Jump to a page, or add something below…"
+              className="field !pl-9"
+              autoFocus
+            />
+          </div>
+          {routeHits.length > 0 && (
+            <div className="rounded-xl border border-[var(--hairline)] overflow-hidden">
+              {routeHits.map((r) => (
+                <button key={r.path} onClick={() => go(r.path)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left hover:bg-[var(--hover)] transition-colors">
+                  <r.icon size={13} className="text-[var(--text-muted)]" /> {r.name}
+                </button>
+              ))}
+            </div>
+          )}
+          {!query && (
+            <div className="flex flex-wrap gap-1.5">
+              <button onClick={() => void syncSalla()} disabled={syncing}
+                className="btn btn-outline !text-[11px] !px-2.5 !py-1 inline-flex items-center gap-1.5">
+                <RefreshCw size={11} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Syncing…' : 'Sync Salla'}
+              </button>
+              <button onClick={() => go('/kpis')} className="btn btn-outline !text-[11px] !px-2.5 !py-1 inline-flex items-center gap-1.5">
+                <BarChart3 size={11} /> Log numbers
+              </button>
+              <button onClick={() => go('/carts')} className="btn btn-outline !text-[11px] !px-2.5 !py-1 inline-flex items-center gap-1.5">
+                <ShoppingCart size={11} /> Cart Recovery
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-1.5 px-5 pt-4">
