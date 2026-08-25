@@ -286,7 +286,6 @@ export function CartRecovery() {
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Cart Recovery</h2>
           <div className="text-sm text-[var(--text-muted)]">
             {carts.length} live carts · <span className="text-[var(--positive)] font-medium">{rescuedCount} rescued</span> all-time
           </div>

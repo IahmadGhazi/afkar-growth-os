@@ -475,7 +475,7 @@ function TaskEditModal({ task, onClose }: { task: Task; onClose: () => void }) {
             <button
               onClick={submitComment}
               disabled={!commentDraft.trim()}
-              className="btn btn-primary !px-3"
+              className="btn btn-outline !px-3"
               aria-label="Post comment"
             >
               Post

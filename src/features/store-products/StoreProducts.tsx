@@ -32,7 +32,6 @@ export function StoreProducts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Products</h2>
           <div className="text-sm text-[var(--text-muted)]">
             {tab === 'catalog'
               ? `${products.filter((p) => p.status === 'active').length} active · ${lowStock.length} low stock`

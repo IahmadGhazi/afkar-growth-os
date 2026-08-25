@@ -278,7 +278,6 @@ export function Chat() {
     <div className="flex flex-col h-full space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]"># team</h2>
           <div className="text-sm text-[var(--text-muted)]">One place for updates and handoffs.</div>
         </div>
         {/* Slack-ease: live search */}

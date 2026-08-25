@@ -208,9 +208,6 @@ export function CouponsManager() {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
-            <TicketPercent size={17} style={{ color: 'var(--brand)' }} /> Coupons
-          </h2>
           <div className="text-sm text-[var(--text-muted)]">Mint, edit, pause, delete — with a brain that advises.</div>
         </div>
         <button onClick={() => void load()} className="btn btn-outline !text-xs !px-3 !py-2 inline-flex items-center gap-1.5">

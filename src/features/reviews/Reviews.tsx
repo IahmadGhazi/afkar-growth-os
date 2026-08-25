@@ -36,7 +36,6 @@ export function Reviews() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Reviews</h2>
           <div className="text-sm text-[var(--text-muted)]">{reviews.length} reviews · avg {avgRating}★</div>
         </div>
       </div>

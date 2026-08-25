@@ -3,6 +3,7 @@ import { RefreshCw, Check, ChevronDown, ShieldCheck, Lock, AlertTriangle, Zap, R
 import { supabase } from '../../lib/supabase'
 import { refreshFromServer } from '../../lib/store'
 import { toast } from '../../lib/toast'
+import { confirm } from '../../components/shared/Confirm'
 import {
   PLATFORM_SETUP, PLATFORM_META, SECURITY_NOTES,
   DIFFICULTY_LABEL, type PlatformId,
@@ -75,7 +76,13 @@ export function IntegrationsPanel() {
   }
 
   const disconnectSalla = async () => {
-    if (!window.confirm('Disconnect Salla?\n\nLive API access stops (sync + coupons + auto-recovery).\nYour collected data and history are KEPT.\nYou can reconnect anytime.')) return
+    const ok = await confirm({
+      title: 'Disconnect Salla?',
+      message: 'Live API access stops (sync + coupons + auto-recovery).\nYour collected data and history are KEPT.\nYou can reconnect anytime.',
+      confirmLabel: 'Disconnect',
+      danger: true,
+    })
+    if (!ok) return
     setSyncing('salla')
     try {
       const token = (await supabase?.auth.getSession())?.data.session?.access_token
@@ -121,7 +128,7 @@ export function IntegrationsPanel() {
             {checked ? `${liveCount} of 5 platforms connected` : 'Checking platforms…'}
           </span>
         </div>
-        <button onClick={syncAll} disabled={syncing === 'all'} className="btn btn-primary !text-xs !px-4 !py-2">
+        <button onClick={syncAll} disabled={syncing === 'all'} className="btn btn-outline !text-xs !px-4 !py-2">
           <RefreshCw size={14} className={cn(syncing === 'all' && 'animate-spin')} />
           {syncing === 'all' ? 'Syncing all…' : 'Sync All'}
         </button>
@@ -299,16 +306,16 @@ function PlatformCard({
               </button>
             </>
           ) : (
-            <button onClick={onConnect} className="btn btn-primary !text-xs !px-4 !py-2 flex-1">
+            <button onClick={onConnect} className="btn btn-outline !text-xs !px-4 !py-2 flex-1">
               <Zap size={13} /> Connect Salla
             </button>
           )
         ) : live ? (
-          <button onClick={onSync} disabled={syncing} className="btn btn-primary !text-xs !px-4 !py-2 flex-1">
-            <RefreshCw size={13} className={cn(syncing && 'animate-spin')} />
-            {syncing ? 'Syncing…' : 'Sync Now'}
-          </button>
-        ) : (
+            <button onClick={onSync} disabled={syncing} className="btn btn-outline !text-xs !px-4 !py-2 flex-1">
+              <RefreshCw size={13} className={cn(syncing && 'animate-spin')} />
+              {syncing ? 'Syncing…' : 'Sync Now'}
+            </button>
+          ) : (
           <button onClick={() => setShowSteps((v) => !v)} className="btn btn-outline !text-xs !px-4 !py-2 flex-1">
             Setup required
           </button>

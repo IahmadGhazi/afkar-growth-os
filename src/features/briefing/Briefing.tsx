@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Sunrise, Flame, ShoppingCart, AlertTriangle, Package, Target, ArrowRight, Snowflake } from 'lucide-react'
+import { Flame, ShoppingCart, AlertTriangle, Package, Target, ArrowRight, Snowflake } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { LiveBadge } from '../../components/shared/LiveBadge'
 import { isTaskOverdue, tasksForClient, currentClient } from '../../lib/selectors'
@@ -57,9 +57,6 @@ export function Briefing({ onNavigate }: { onNavigate: (path: string) => void })
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
-            <Sunrise size={18} style={{ color: '#d29a0c' }} /> Morning Briefing
-          </h2>
           <div className="text-sm text-[var(--text-muted)]">{greeting()} — here's your store at a glance.</div>
         </div>
       </div>

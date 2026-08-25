@@ -84,7 +84,6 @@ export function Orders() {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Orders</h2>
           <div className="text-sm text-[var(--text-muted)]">
             {orders.length} orders · {validRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })} SAR revenue · {todayOrders.length} today
           </div>

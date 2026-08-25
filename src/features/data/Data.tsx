@@ -138,7 +138,7 @@ function CsvImport() {
         <button
           onClick={importRows}
           disabled={!text.trim()}
-          className="btn btn-primary"
+          className="btn btn-outline"
         >
           <FileUp size={15} /> Import
         </button>
@@ -274,7 +274,7 @@ function SheetSources() {
           }}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => fileInputRef.current?.click()} disabled={busy} className="btn btn-primary">
+          <button           onClick={() => fileInputRef.current?.click()} disabled={busy} className="btn btn-outline">
             <FileUp size={14} /> Import from Excel
           </button>
           <button onClick={exportExcel} className="btn btn-outline">
@@ -314,7 +314,7 @@ function SheetSources() {
         <div className="flex flex-wrap items-center gap-2 mt-3">
           {sheetsConnection?.connected ? (
             <>
-              <button onClick={syncSheet} disabled={busy} className="btn btn-primary">
+              <button onClick={syncSheet} disabled={busy} className="btn btn-outline">
                 <RefreshCw size={14} className={busy ? 'animate-spin' : ''} /> Sync now
               </button>
               <button onClick={() => actions.disconnectSource('google_sheets')} className="btn btn-outline">
@@ -322,7 +322,7 @@ function SheetSources() {
               </button>
             </>
           ) : (
-            <button onClick={connectSheet} disabled={busy} className="btn btn-primary">
+            <button onClick={connectSheet} disabled={busy} className="btn btn-outline">
               <Link2 size={14} /> Connect &amp; import
             </button>
           )}

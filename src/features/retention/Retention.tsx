@@ -87,7 +87,6 @@ export function Retention() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Retention</h2>
           <div className="text-sm text-[var(--text-muted)]">Who comes back, who walks away — computed live from your orders</div>
         </div>
       </div>

@@ -135,7 +135,6 @@ export function Team() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Team Members</h2>
           <div className="text-sm text-[var(--text-muted)]">{members.length} active members</div>
         </div>
         <PrimaryButton onClick={() => setShowForm(!showForm)}>

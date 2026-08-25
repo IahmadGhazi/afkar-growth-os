@@ -79,7 +79,6 @@ export function Settings() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">Settings</h2>
         {isAdmin && (
           <div className="flex gap-1 glass-card rounded-xl p-1">
             {(['general', 'users'] as const).map((t) => (

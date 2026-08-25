@@ -52,7 +52,6 @@ export function Customers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Customers</h2>
           <div className="text-sm text-[var(--text-muted)]">
             {customers.length} customers · {totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} SAR lifetime value · auto-segmented by RFM
           </div>
@@ -65,7 +64,7 @@ export function Customers() {
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setSegment(null)}
-          className={`chip transition-all ${segment === null ? '!bg-[var(--gold-soft,#f0c42e22)] !border-[#d29a0c55] !text-[var(--text-primary)]' : ''}`}
+          className={`chip transition-all ${segment === null ? '!bg-[var(--warning-soft)] !border-[#d29a0c55] !text-[var(--text-primary)]' : ''}`}
         >
           All <span className="opacity-60">{intel.length}</span>
         </button>

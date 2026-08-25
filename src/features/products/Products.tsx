@@ -151,7 +151,7 @@ function ProductCard({
             {next && (
               <button
                 onClick={() => actions.moveProduct(product.id, next)}
-                className="btn btn-primary !px-2.5 !py-1.5 !text-xs"
+                className="btn btn-outline !px-2.5 !py-1.5 !text-xs"
                 title={`Move to ${STAGES.find((s) => s.id === next)?.label}`}
               >
                 {product.status === 'testing' ? (
@@ -302,7 +302,6 @@ export function Products() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Product Research</h2>
           <div className="text-sm text-[var(--text-muted)]">
             {active.length} live candidates · {killed.length} killed
           </div>

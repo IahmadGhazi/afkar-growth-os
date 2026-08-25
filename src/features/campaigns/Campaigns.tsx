@@ -175,7 +175,7 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
             <input type="number" value={form.purchases} onChange={(e) => setForm({ ...form, purchases: e.target.value })} placeholder="Purchases" className="field !py-1.5 !text-xs" />
             <input type="number" value={form.revenue} onChange={(e) => setForm({ ...form, revenue: e.target.value })} placeholder="Revenue (SAR)" className="field !py-1.5 !text-xs col-span-2" />
           </div>
-          <button onClick={submitLog} className="btn btn-primary w-full !py-1.5 !text-xs">
+                      <button onClick={submitLog} className="btn btn-outline w-full !py-1.5 !text-xs">
             <PencilLine size={12} /> Save day
           </button>
         </div>
@@ -229,12 +229,11 @@ export function Campaigns() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Campaigns</h2>
           <div className="text-sm text-[var(--text-muted)]">
             {campaigns.filter((c) => c.status === 'active').length} active · {state.campaignMetrics.length} days logged
           </div>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn btn-primary shrink-0">
+                    <button onClick={() => setShowForm(!showForm)} className="btn btn-outline shrink-0">
           {showForm ? <X size={16} /> : <Plus size={16} />}
           <span className="hidden sm:inline">{showForm ? 'Close' : 'New Campaign'}</span>
         </button>
