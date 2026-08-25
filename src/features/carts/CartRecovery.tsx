@@ -414,12 +414,15 @@ export function CartRecovery() {
             const TempIcon = meta.icon
             const contacted = Boolean(cart.last_contacted_at)
             const override = rowOverrides.get(cart.id)
-            const brain = recommendCoupon(cart, cart.customer_id ? intelByCustomer.get(cart.customer_id) ?? null : null)
+            // LIVE minutes — one source of truth for label + brain + temp
+            const liveMins = Math.max(0, Math.floor((Date.now() - new Date(cart.updated_at).getTime()) / 60000))
+            const brain = recommendCoupon({ ...cart, age_minutes: liveMins }, cart.customer_id ? intelByCustomer.get(cart.customer_id) ?? null : null)
             const effPercent = override?.percent ?? percent
             const effHours = override?.hours ?? validHours
             const brainMatches = brain.percent === effPercent && brain.hours === effHours
             const armedCode = codeFor(cart)
             const health = codeHealth(armedCode)
+            const ageLabel = liveMins < 60 ? `${liveMins}m` : liveMins < 1440 ? `${Math.floor(liveMins / 60)}h` : `${Math.floor(liveMins / 1440)}d`
             return (
               <div key={cart.id} className="glass-card relative overflow-hidden px-4 sm:px-5 py-3.5">
                 <span aria-hidden className="absolute inset-y-0 left-0 w-[3px]" style={{ background: meta.color }} />
@@ -431,9 +434,7 @@ export function CartRecovery() {
                       <TempIcon size={11} /> {meta.label}
                     </span>
                     <div className="text-[11px] text-[var(--text-muted)] mt-0.5 tabular-nums">
-                      {cart.age_minutes != null && cart.age_minutes < 60
-                        ? `${cart.age_minutes}m`
-                        : cart.age_minutes != null ? `${Math.floor(cart.age_minutes / 60)}h` : ''}
+                      {ageLabel}
                     </div>
                   </div>
 
