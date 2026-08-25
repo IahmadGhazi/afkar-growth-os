@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { TicketPercent, Trash2, RefreshCw, Sparkles, Clock, Users, ShoppingCart, Pencil, Power, Plus, Brain } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toast } from '../../lib/toast'
+import { confirm } from '../../components/shared/Confirm'
 import { useApp } from '../../lib/store'
 
 interface SallaCoupon {
@@ -134,18 +135,23 @@ export function CouponsManager() {
   const cleanupExpired = async () => {
     const dead = (coupons ?? []).filter((c) => c.expiryDate && new Date(c.expiryDate.replace(' ', 'T')).getTime() < Date.now())
     if (dead.length === 0) { toast.info('No expired coupons to clean'); return }
-    if (!window.confirm(`Delete ${dead.length} expired coupon${dead.length > 1 ? 's' : ''} from your Salla store?\n\nExpired codes are ops debt — they clutter the list and can leak if re-activated by accident.`)) return
+    const ok = await confirm({
+      title: `Clean ${dead.length} expired coupon${dead.length > 1 ? 's' : ''}?`,
+      message: 'Deletes them from your Salla store.\nExpired codes are ops debt — they clutter the list and can leak if re-activated by accident.',
+      confirmLabel: 'Clean them', danger: true,
+    })
+    if (!ok) return
     setCleaning(true)
-    let ok = 0
+    let cleaned = 0
     for (const c of dead) {
       try {
         const res = await authedFetch(`/api/salla/coupons?id=${c.id}`, { method: 'DELETE' })
         const body = await res.json().catch(() => ({}) as Record<string, unknown>)
-        if (res.ok && body.ok) ok++
+        if (res.ok && body.ok) cleaned++
       } catch { /* keep going */ }
     }
     setCleaning(false)
-    toast.success(`Cleaned ${ok}/${dead.length} expired coupons`)
+    toast.success(`Cleaned ${cleaned}/${dead.length} expired coupons`)
     await load()
   }
 
@@ -174,7 +180,12 @@ export function CouponsManager() {
   }
 
   const remove = async (c: SallaCoupon) => {
-    if (!window.confirm(`Delete coupon ${c.code} from your Salla store?`)) return
+    const ok = await confirm({
+      title: `Delete ${c.code}?`,
+      message: 'Removes it from your Salla store permanently.\nAny cart still holding it will show a dead badge you can detach.',
+      confirmLabel: 'Delete forever', danger: true,
+    })
+    if (!ok) return
     try {
       const res = await authedFetch(`/api/salla/coupons?id=${c.id}`, { method: 'DELETE' })
       const body = await res.json().catch(() => ({}) as Record<string, unknown>)

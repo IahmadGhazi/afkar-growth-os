@@ -29,6 +29,7 @@ import { Data } from './features/data/Data'
 import { Settings } from './features/settings/Settings'
 import { Report } from './features/report/Report'
 import { NotificationsPanel } from './components/notifications/NotificationsPanel'
+import { AppConfirm } from './components/shared/Confirm'
 
 const pageTitles: Record<string, string> = {
   '/': 'Command Center',
@@ -249,6 +250,7 @@ function App() {
         onNavigate={navigate}
       />
       <Toaster />
+      <AppConfirm />
     </div>
   )
 }

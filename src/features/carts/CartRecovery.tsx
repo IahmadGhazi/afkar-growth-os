@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase'
 import { refreshFromServer } from '../../lib/store'
 import { computeCustomerIntel } from '../../lib/rfm'
 import { recommendCoupon } from '../../lib/couponsBrain'
+import { confirm } from '../../components/shared/Confirm'
 import type { AbandonedCart } from '../../types/database'
 
 type Temp = 'hot' | 'warm' | 'cold'
@@ -148,7 +149,12 @@ export function CartRecovery() {
   const detachCoupon = async (cart: AbandonedCart) => {
     const code = codeFor(cart)
     if (!code) return
-    if (!window.confirm(`Remove ${code} from ${cart.customer_name ?? 'this cart'}?\n\nThe coupon stays alive in your store (manage it in Products → Coupons) — it just detaches from this cart.`)) return
+    const ok = await confirm({
+      title: `Remove ${code}?`,
+      message: `Detaches from ${cart.customer_name ?? 'this cart'}.\nThe coupon stays alive in your store (Products → Coupons) — the cart just becomes coupon-free again.`,
+      confirmLabel: 'Detach', danger: false,
+    })
+    if (!ok) return
     if (!supabase) return
     const res = await supabase.from('abandoned_carts').update({ coupon_code: null }).eq('id', cart.id)
     if (res.error) { toast.error(`Detach failed: ${res.error.message}`); return }
@@ -203,7 +209,12 @@ export function CartRecovery() {
   const batchArm = async () => {
     const targets = armable.slice(0, 50)
     if (targets.length === 0) { toast.error('Every visible cart already has a coupon'); return }
-    if (!window.confirm(`Arm ${targets.length} carts?\n\nMints ONE group coupon with ${targets.length} unique ${percent}% codes (valid ${validHours >= 24 ? `${Math.round(validHours / 24)}d` : `${validHours}h`}) and attaches one code per cart. Each code is private + traceable.`)) return
+    const ok = await confirm({
+      title: `Arm ${targets.length} carts?`,
+      message: `Mints ONE group coupon with ${targets.length} unique ${percent}% codes (valid ${validHours >= 24 ? `${Math.round(validHours / 24)}d` : `${validHours}h`}) and attaches one code per cart.\nEach code is private + traceable — leak-proof bulk.`,
+      confirmLabel: 'Arm them', danger: false,
+    })
+    if (!ok) return
     setBatching(true)
     try {
       const { data } = await supabase!.auth.getSession()
@@ -333,6 +344,11 @@ export function CartRecovery() {
         <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
           <TicketPercent size={12} /> Coupon strength
         </span>
+        {armable.length === 0 && carts.length > 0 && (
+          <span className="text-[11px] text-[var(--text-muted)]">
+            Every cart is armed — <b>click any coupon badge to swap it</b>, ✕ to detach.
+          </span>
+        )}
         <div className="flex gap-1.5 items-center">
           {[5, 10, 15, 20, 25].map((p) => (
             <button key={p} onClick={() => { setPercent(p); setCustomPct('') }}
@@ -415,9 +431,13 @@ export function CartRecovery() {
                             : { background: 'rgba(245,158,11,.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,.3)' }
                         return (
                           <span className="badge text-[9px] font-mono inline-flex items-center gap-1" style={style}
-                            title={health === 'expired' ? 'This coupon expired or was paused — detach it and arm a fresh one' : health === 'unknown' ? 'Coupon not found in store (deleted?) — detach it' : 'Live coupon attached'}>
-                            <TicketPercent size={9} /> {codeFor(cart)}
-                            {health !== 'live' && <span className="font-sans font-semibold">{health === 'expired' ? 'dead' : '??'}</span>}
+                            title={health === 'expired' ? 'This coupon expired or was paused — click to swap, or X to detach' : health === 'unknown' ? 'Coupon not found in store (deleted?) — click to swap a fresh one' : 'Live coupon — click to swap it for another'}>
+                            <button onClick={(e) => { e.stopPropagation(); setPickerCart(cart); setPickerSelected(null) }}
+                              className="inline-flex items-center gap-1 hover:underline" style={{ color: 'inherit' }}
+                              title="Click to swap this coupon">
+                              <TicketPercent size={9} /> {codeFor(cart)}
+                              {health !== 'live' && <span className="font-sans font-semibold">{health === 'expired' ? 'dead' : '??'}</span>}
+                            </button>
                             <button onClick={(e) => { e.stopPropagation(); void detachCoupon(cart) }}
                               className="opacity-60 hover:opacity-100 ml-0.5" title="Remove coupon from this cart"
                               style={{ color: 'inherit' }}>
