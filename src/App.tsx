@@ -73,6 +73,8 @@ function App() {
   useEffect(() => {
     if (window.location.pathname !== currentPath) {
       window.history.pushState({}, '', currentPath)
+      // Below lg the window itself scrolls — reset it so every page starts at top
+      if (window.innerWidth < 1024) window.scrollTo({ top: 0 })
     }
   }, [currentPath])
 
