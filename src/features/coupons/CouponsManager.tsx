@@ -391,7 +391,7 @@ export function CouponsManager() {
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/45 animate-[fadeIn_.2s_ease]" onClick={() => setEditing(null)} />
-          <div className="relative glass-card p-6 w-full max-w-sm space-y-4 animate-[pulseIn_.3s_var(--ease-spring)_both]">
+          <div className="relative w-full max-w-sm rounded-2xl border border-[var(--hairline)] bg-[var(--card)] shadow-2xl p-6 space-y-4 animate-[pulseIn_.3s_var(--ease-spring)_both]">
             <div className="text-sm font-bold text-[var(--text-primary)]">Edit <span className="font-mono">{editing.code}</span></div>
             <div className="space-y-3">
               <div>
@@ -420,7 +420,7 @@ export function CouponsManager() {
       {editPreset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/45 animate-[fadeIn_.2s_ease]" onClick={() => setEditPreset(null)} />
-          <div className="relative glass-card p-6 w-full max-w-sm space-y-3 animate-[pulseIn_.3s_var(--ease-spring)_both]">
+          <div className="relative w-full max-w-sm rounded-2xl border border-[var(--hairline)] bg-[var(--card)] shadow-2xl p-6 space-y-3 animate-[pulseIn_.3s_var(--ease-spring)_both]">
             <div className="text-sm font-bold text-[var(--text-primary)]">{playbook.some((p) => p.id === editPreset.id) ? 'Edit play' : 'New play'}</div>
             <input value={editPreset.label} onChange={(e) => setEditPreset({ ...editPreset, label: e.target.value })}
               placeholder="Name (e.g. Eid special)" className="field !py-2 text-sm" />

@@ -542,7 +542,7 @@ export function CartRecovery() {
         return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/45 animate-[fadeIn_.2s_ease]" onClick={() => { setPickerCart(null); setPickerSelected(null) }} />
-          <div className="relative glass-card p-5 w-full max-w-lg space-y-4 animate-[pulseIn_.3s_var(--ease-spring)_both] max-h-[85vh] overflow-y-auto">
+          <div className="relative w-full max-w-lg rounded-2xl border border-[var(--hairline)] bg-[var(--card)] shadow-2xl p-5 space-y-4 animate-[pulseIn_.3s_var(--ease-spring)_both] max-h-[85vh] overflow-y-auto">
             <div>
               <div className="text-sm font-bold text-[var(--text-primary)]">Pick a coupon for <span dir="auto">{pickerCart.customer_name ?? 'Guest'}</span></div>
               <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
@@ -581,7 +581,7 @@ export function CartRecovery() {
                     className="w-full text-left rounded-xl border px-4 py-3 transition-colors flex items-center gap-3"
                     style={selected
                       ? { borderColor: 'var(--brand)', background: 'var(--warning-soft)' }
-                      : { borderColor: 'var(--hairline)', background: 'var(--card)' }}>
+                      : { borderColor: 'var(--hairline)', background: 'var(--bg)' }}>
                     <span className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 font-mono text-xs font-bold"
                       style={{ background: selected ? 'var(--warning-soft)' : 'var(--track)', color: selected ? 'var(--brand)' : 'var(--text-primary)' }}>
                       {ac.amount != null ? `${ac.amount}%` : '★'}
@@ -606,7 +606,7 @@ export function CartRecovery() {
               )}
             </div>
 
-            <div className="rounded-xl border border-[var(--hairline)] bg-[var(--card)] px-4 py-3 flex items-center gap-3">
+            <div className="rounded-xl border border-[var(--hairline)] bg-[var(--bg)] px-4 py-3 flex items-center gap-3">
               {pickerSelected ? (
                 <>
                   <div className="min-w-0 flex-1 text-xs text-[var(--text-primary)]">

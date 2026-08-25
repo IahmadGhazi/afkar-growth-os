@@ -41,7 +41,7 @@ export function AppConfirm() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="alertdialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/45 animate-[fadeIn_.15s_ease]" onClick={() => close(false)} />
-      <div className="relative glass-card p-6 w-full max-w-sm space-y-4 animate-[pulseIn_.25s_var(--ease-spring)_both]">
+      <div className="relative w-full max-w-sm rounded-2xl border border-[var(--hairline)] bg-[var(--card)] shadow-2xl p-6 space-y-4 animate-[pulseIn_.25s_var(--ease-spring)_both]">
         <div className="flex items-start gap-3">
           <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
             style={{ background: s.danger ? 'rgba(239,68,68,.12)' : 'rgba(240,196,46,.14)' }}>
