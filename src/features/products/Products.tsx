@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Plus,
   Pencil,
@@ -84,6 +84,50 @@ function hostOf(url: string | null): string | null {
   }
 }
 
+function LinkPreview({ url }: { url: string }) {
+  const [data, setData] = useState<{ image: string | null; title: string | null; host: string | null; screenshot: string | null } | null>(null)
+  const [err, setErr] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    setData(null)
+    setErr(false)
+    fetch(`/api/preview?url=${encodeURIComponent(url)}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled) {
+          if (j.ok && (j.image || j.screenshot)) setData(j)
+          else setErr(true)
+        }
+      })
+      .catch(() => !cancelled && setErr(true))
+    return () => { cancelled = true }
+  }, [url])
+  if (err) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden border border-[var(--hairline)] bg-[var(--surface)] p-3 text-xs text-[var(--text-muted)] hover:underline">
+        Preview unavailable — open source →
+      </a>
+    )
+  }
+  if (!data) {
+    return <div className="h-36 rounded-xl border border-[var(--hairline)] bg-[var(--surface)] animate-pulse" />
+  }
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden border border-[var(--hairline)] group">
+      {data.image ? (
+        <img src={data.image} alt={data.title ?? 'source product'} className="w-full h-36 object-cover group-hover:scale-[1.02] transition-transform duration-300" loading="lazy"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      ) : data.screenshot ? (
+        <img src={data.screenshot} alt="site preview" className="w-full h-36 object-cover" loading="lazy" />
+      ) : null}
+      <div className="px-3 py-2 bg-[var(--card)] flex items-center justify-between gap-2">
+        <span className="text-[11px] text-[var(--text-muted)] truncate">{data.title ?? data.host ?? url}</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--warning-soft)] text-[var(--brand)] shrink-0">source</span>
+      </div>
+    </a>
+  )
+}
+
 function ProductCard({
   product,
   onEdit,
@@ -119,36 +163,41 @@ function ProductCard({
 
   return (
     <div className="glass-card hover-lift p-4 flex flex-col gap-3">
-      {/* Live store preview — the real photo + real performance */}
-      {storeMatch && (
-        <div className="rounded-xl overflow-hidden border border-[var(--hairline)]">
-          <div className="relative">
-            {storeMatch.image_url ? (
-              <img src={storeMatch.image_url} alt={storeMatch.name} className="w-full h-36 object-cover" loading="lazy" />
-            ) : (
-              <div className="w-full h-20 flex items-center justify-center bg-[var(--track)] text-xs text-[var(--text-muted)]">no photo</div>
-            )}
-            <span className="absolute top-2 left-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-              style={{ background: 'rgba(16,185,129,.9)', color: '#04120c' }}>
-              live on your store
-            </span>
-            {product.store_product_id && (
-              <button onClick={() => {
-                try { localStorage.removeItem(`candidate-link-${product.id}`) } catch {}
-                actions.updateProduct(product.id, { store_product_id: null })
-              }}
-                aria-label="Unlink store product" title="Unlink"
-                className="absolute top-2 right-2 p-1 rounded bg-black/45 text-white/85 hover:text-white transition-colors">
-                <X size={11} />
-              </button>
-            )}
-          </div>
-          <div className="px-3 py-2 bg-[var(--card)] flex items-center justify-between gap-2">
-            <span className="text-[11px] text-[var(--text-muted)] truncate" dir="auto">{storeMatch.name}</span>
-            <span className="text-[11px] font-semibold text-[var(--text-primary)] shrink-0 tabular-nums">
-              {storeMatch.sales_count} sold{storeMatch.rating_avg ? ` · ${storeMatch.rating_avg.toFixed(1)}★` : ''}
-            </span>
-          </div>
+      {/* Previews — store product (left) + source link (right) */}
+      {(storeMatch || product.source_url) && (
+        <div className={storeMatch && product.source_url ? "grid grid-cols-2 gap-3" : ""}>
+          {storeMatch && (
+            <div className="rounded-xl overflow-hidden border border-[var(--hairline)]">
+              <div className="relative">
+                {storeMatch.image_url ? (
+                  <img src={storeMatch.image_url} alt={storeMatch.name} className="w-full h-36 object-cover" loading="lazy" />
+                ) : (
+                  <div className="w-full h-20 flex items-center justify-center bg-[var(--track)] text-xs text-[var(--text-muted)]">no photo</div>
+                )}
+                <span className="absolute top-2 left-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                  style={{ background: 'rgba(16,185,129,.9)', color: '#04120c' }}>
+                  live on your store
+                </span>
+                {product.store_product_id && (
+                  <button onClick={() => {
+                    try { localStorage.removeItem(`candidate-link-${product.id}`) } catch {}
+                    actions.updateProduct(product.id, { store_product_id: null })
+                  }}
+                    aria-label="Unlink store product" title="Unlink"
+                    className="absolute top-2 right-2 p-1 rounded bg-black/45 text-white/85 hover:text-white transition-colors">
+                    <X size={11} />
+                  </button>
+                )}
+              </div>
+              <div className="px-3 py-2 bg-[var(--card)] flex items-center justify-between gap-2">
+                <span className="text-[11px] text-[var(--text-muted)] truncate" dir="auto">{storeMatch.name}</span>
+                <span className="text-[11px] font-semibold text-[var(--text-primary)] shrink-0 tabular-nums">
+                  {storeMatch.sales_count} sold{storeMatch.rating_avg ? ` · ${storeMatch.rating_avg.toFixed(1)}★` : ''}
+                </span>
+              </div>
+            </div>
+          )}
+          {product.source_url && <LinkPreview url={product.source_url} />}
         </div>
       )}
       {!storeMatch && salla.length > 0 && (
