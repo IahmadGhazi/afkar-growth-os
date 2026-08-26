@@ -134,6 +134,8 @@ export function CouponsManager() {
   const [editing, setEditing] = useState<SallaCoupon | null>(null)
   const [editPercent, setEditPercent] = useState(10)
   const [editExpiry, setEditExpiry] = useState('')
+  const [editCap, setEditCap] = useState<string>('')
+  const [editMin, setEditMin] = useState<string>('')
   const [savingEdit, setSavingEdit] = useState(false)
 
   const load = async () => {
@@ -216,7 +218,13 @@ export function CouponsManager() {
     try {
       const res = await authedFetch('/api/salla/coupons/update', {
         method: 'POST',
-        body: JSON.stringify({ id: editing.id, percentOff: editPercent, expiresAt: editExpiry || undefined }),
+        body: JSON.stringify({
+          id: editing.id,
+          percentOff: editPercent,
+          expiresAt: editExpiry || undefined,
+          usageLimit: editCap ? Number(editCap) : undefined,
+          minimumAmount: editMin ? Number(editMin) : undefined,
+        }),
       })
       const body = await res.json()
       if (res.ok && body.ok) { toast.success(`${editing.code} updated`); setEditing(null); await load() }
@@ -418,7 +426,7 @@ export function CouponsManager() {
                   </div>
                 </div>
                 <div className="flex items-center gap-0.5 shrink-0">
-                  <button onClick={() => { setEditing(c); setEditPercent(c.type === 'percentage' ? (c.amount ?? 10) : 10); setEditExpiry(c.expiryDate ? c.expiryDate.slice(0, 10) : '') }}
+                  <button onClick={() => { setEditing(c); setEditPercent(c.type === 'percentage' ? (c.amount ?? 10) : 10); setEditExpiry(c.expiryDate ? c.expiryDate.slice(0, 10) : ''); setEditCap(c.usageLimit != null ? String(c.usageLimit) : ''); setEditMin(c.minimumAmount != null ? String(c.minimumAmount) : '') }}
                     aria-label={`Edit ${c.code}`} title="Edit numbers / expiry"
                     className="p-2 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover)] transition-colors">
                     <Pencil size={14} />
@@ -457,6 +465,18 @@ export function CouponsManager() {
               <div>
                 <label className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide">Expiry date</label>
                 <input type="date" value={editExpiry} onChange={(e) => setEditExpiry(e.target.value)} className="field !py-2" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide">Usage cap (∞ = blank)</label>
+                  <input type="number" min={1} placeholder="∞" value={editCap} onChange={(e) => setEditCap(e.target.value)}
+                    className="field !py-2 tabular-nums" />
+                </div>
+                <div>
+                  <label className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide">Min order SAR</label>
+                  <input type="number" min={0} placeholder="none" value={editMin} onChange={(e) => setEditMin(e.target.value)}
+                    className="field !py-2 tabular-nums" />
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-2">

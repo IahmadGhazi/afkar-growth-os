@@ -8,6 +8,7 @@ import {
   Trash2,
   Trophy,
   FlaskConical,
+  RotateCcw,
 } from 'lucide-react'
 import { useApp } from '../../lib/store'
 import { SectionTitle, EmptyState } from '../../components/shared/ui'
@@ -96,9 +97,13 @@ function ProductCard({
   const next = NEXT_STAGE[product.status]
   const isKilled = product.status === 'killed'
 
-  // LIVE PREVIEW: manual link wins, then auto-match by name
+  // LIVE PREVIEW: manual link wins (DB or local fallback), then auto-match by name
   const salla = state.sallaProducts ?? []
-  const linked = product.store_product_id ? salla.find((sp) => sp.id === product.store_product_id) ?? null : null
+  const localLink = (() => {
+    try { return localStorage.getItem(`candidate-link-${product.id}`) } catch { return null }
+  })()
+  const effectiveLinkId = product.store_product_id ?? localLink ?? null
+  const linked = effectiveLinkId ? salla.find((sp) => sp.id === effectiveLinkId) ?? null : null
   const storeMatch = useMemo(() => {
     if (linked) return linked
     const words = product.name.toLowerCase().split(/\s+/).filter((w) => w.length >= 3)
@@ -128,7 +133,10 @@ function ProductCard({
               live on your store
             </span>
             {product.store_product_id && (
-              <button onClick={() => actions.updateProduct(product.id, { store_product_id: null })}
+              <button onClick={() => {
+                try { localStorage.removeItem(`candidate-link-${product.id}`) } catch {}
+                actions.updateProduct(product.id, { store_product_id: null })
+              }}
                 aria-label="Unlink store product" title="Unlink"
                 className="absolute top-2 right-2 p-1 rounded bg-black/45 text-white/85 hover:text-white transition-colors">
                 <X size={11} />
@@ -146,7 +154,11 @@ function ProductCard({
       {!storeMatch && salla.length > 0 && (
         <select
           value=""
-          onChange={(e) => { if (e.target.value) actions.updateProduct(product.id, { store_product_id: e.target.value }) }}
+          onChange={(e) => {
+            if (!e.target.value) return
+            try { localStorage.setItem(`candidate-link-${product.id}`, e.target.value) } catch {}
+            actions.updateProduct(product.id, { store_product_id: e.target.value })
+          }}
           aria-label="Link a store product"
           className="field !py-1.5 !text-xs text-[var(--text-muted)]"
           title="Link this candidate to its live product — photo + real sales appear here"
@@ -198,7 +210,24 @@ function ProductCard({
 
       <div className="mt-auto pt-1 flex items-center justify-between gap-2 text-xs text-[var(--text-muted)] border-t border-[var(--hairline)] pt-3">
         <span>by {nameById(state, product.researcher_id)}</span>
-        {!isKilled && (
+        {isKilled ? (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => actions.moveProduct(product.id, 'discovered')}
+              className="btn btn-outline !px-2.5 !py-1.5 !text-xs"
+              title="Revive to Discovered"
+            >
+              <RotateCcw size={12} /> Revive
+            </button>
+            <button
+              onClick={() => actions.deleteProduct(product.id)}
+              className="icon-btn icon-btn-danger w-7 h-7"
+              aria-label="Delete candidate permanently"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        ) : (
           <div className="flex items-center gap-1">
             <button
               onClick={() => onEdit(product)}
