@@ -293,7 +293,8 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
       <GoalGauge />
 
       {/* Key metrics — everything else, dense and scannable by department */}
-      <section>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start xl:mt-6">
+      <section className="xl:col-span-2 xl:order-1">
         <SectionTitle>Business Performance</SectionTitle>
         <div className="glass-card divide-y divide-[var(--hairline)] overflow-hidden">
           {statCards
@@ -324,7 +325,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
       </section>
 
       {/* Platform Results */}
-      <section>
+      <section className="xl:col-span-2 xl:order-2">
         <SectionTitle>Platform Results</SectionTitle>
         <div className="glass-card p-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -370,7 +371,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
       </section>
 
       {/* Performance Trends */}
-      <section>
+      <section className="xl:col-span-2 xl:order-3">
         <SectionTitle>Performance Trends</SectionTitle>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {trendOrder.map((t) => {
@@ -402,7 +403,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
       </section>
 
       {/* AI Briefing */}
-      <section>
+      <section className="xl:order-7">
         <div className="glass-card p-6 bg-gradient-to-br from-[rgba(210,154,12,0.09)] to-[rgba(210,154,12,0.02)] border-[rgba(210,154,12,0.25)]">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-9 h-9 rounded-xl bg-[var(--brand-soft)] flex items-center justify-center">
@@ -432,7 +433,7 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
       </section>
 
       {/* Abandoned Cart Opportunity */}
-      <section>
+      <section className="xl:order-8">
         <div className="glass-card glass-danger p-6">
           <div className="flex items-start gap-4 flex-wrap">
             <div className="w-10 h-10 rounded-xl bg-[var(--warning-soft)] flex items-center justify-center shrink-0">
@@ -472,16 +473,16 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 xl:col-span-3 xl:order-4">
         {/* Store Pulse — live heartbeat of the store */}
-        <section className="lg:col-span-1 order-first lg:order-none">
-          <SectionTitle>Store Pulse</SectionTitle>
+          <section className="xl:order-6">
+            <SectionTitle>Store Pulse</SectionTitle>
           <StorePulse orders={state.sallaOrders ?? []} customers={state.sallaCustomers ?? []} products={state.sallaProducts ?? []} />
         </section>
 
         {/* Needs Attention */}
-        <section className="lg:col-span-2">
-          <SectionTitle>Needs Attention</SectionTitle>
+          <section className="xl:col-span-2 xl:order-4">
+            <SectionTitle>Needs Attention</SectionTitle>
           {overdueTasks.length + blockedTasks.length + reviewTasks.length === 0 ? (
             <div className="glass-card p-8 text-center">
               <div className="text-sm font-semibold text-[var(--positive)]">Nothing needs you. Everything is moving.</div>
@@ -571,8 +572,8 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
         </section>
 
         {/* Spend Pacing & Anomaly */}
-        <section>
-          <SectionTitle>Spend Pacing & Anomaly</SectionTitle>
+      <section className="xl:col-span-2 xl:order-5">
+        <SectionTitle>Spend Pacing & Anomaly</SectionTitle>
           {!pacing ? (
             <div className="glass-card p-4 text-sm text-[var(--text-muted)]">
               Add a Spend KPI to enable pacing tracking.
@@ -629,10 +630,9 @@ export function CommandCenter({ onNavigate }: { onNavigate?: (path: string) => v
         </section>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Weekly Objective Progress */}
+      {/* Weekly Objective Progress */}
         {objective && (
-          <section className="lg:col-span-2">
+          <section className="xl:order-9">
             <SectionTitle>Weekly Objective</SectionTitle>
             <div className="glass-card p-5">
               <div className="flex items-center gap-3 mb-4">

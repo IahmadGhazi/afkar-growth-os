@@ -207,9 +207,15 @@ export async function onRequest(context: { request: Request; env: Record<string,
           status: typeof o.status === "string" ? o.status : (o.status?.slug ?? o.status?.name ?? "payment_completed"),
           payment_method: typeof o.payment_method === "string" ? o.payment_method : (o.payment_method?.slug ?? null),
           selling_channel: o.selling_channel ?? null,
-          total_amount: num(o.amounts?.total?.amount) ?? num(o.total) ?? 0,
-          shipping_cost: num(o.amounts?.shipping?.amount) ?? 0,
-          tax_amount: num(o.amounts?.tax?.amount) ?? 0,
+          // Salla shapes vary between webhook and REST — resolve every known path
+          total_amount:
+            num(o.amounts?.total?.amount) ??
+            num(o.totals?.amount) ??
+            num(o.total?.amount) ?? num(o.total) ??
+            num(o.amounts?.total) ??
+            0,
+          shipping_cost: num(o.amounts?.shipping?.amount) ?? num(o.shipping_cost) ?? 0,
+          tax_amount: num(o.amounts?.tax?.amount) ?? num(o.tax_amount) ?? 0,
           currency: o.amounts?.total?.currency ?? "SAR",
           items_count: Array.isArray(o.items) ? o.items.length : 0,
           items: Array.isArray(o.items)

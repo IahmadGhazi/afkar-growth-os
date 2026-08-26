@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   LayoutDashboard, CheckSquare, Target, BarChart3, Users, Database, Bell,
   FileText, MessageSquare, Package, Megaphone, Users2, ShoppingBag, Store,
@@ -78,13 +78,28 @@ export function Sidebar({ currentPath, onNavigate, onOpenNotifications }: Sideba
     }).filter(Boolean) as (Child | Mother)[]
   }, [state])
 
-  // The mother that owns the current route is auto-expanded
-  const openMother = useMemo(() => {
+  // Route keeps the active mother expanded; your manual toggles override it.
+  const routeMother = useMemo(() => {
     for (const entry of visible) {
       if (isMother(entry) && entry.children.some((c) => c.path === currentPath)) return entry.name
     }
     return null
   }, [visible, currentPath])
+
+  const [toggled, setToggled] = useState<Set<string>>(new Set())
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  const isOpen = (name: string) => {
+    if (toggled.has(name)) return true
+    if (collapsed.has(name)) return false
+    return routeMother === name
+  }
+
+  const toggleMother = (name: string) => {
+    const opening = !isOpen(name)
+    setToggled((prev) => { const n = new Set(prev); if (opening) n.add(name); else n.delete(name); return n })
+    setCollapsed((prev) => { const n = new Set(prev); if (opening) n.delete(name); else n.add(name); return n })
+  }
 
   const currentUser = state.profiles.find((p) => p.id === state.currentUserId)
   const unread = (state.notifications ?? []).filter(
@@ -122,15 +137,12 @@ export function Sidebar({ currentPath, onNavigate, onOpenNotifications }: Sideba
               </button>
             )
           }
-          const open = openMother === entry.name
+          const open = isOpen(entry.name)
           const containsActive = entry.children.some((c) => c.path === currentPath)
           return (
             <div key={entry.name}>
               <button
-                onClick={() => {
-                  if (open && containsActive) return // collapse? keep context — no-op on active mother
-                  onNavigate(entry.children[0].path)
-                }}
+                onClick={() => toggleMother(entry.name)}
                 className={cn(
                   'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150',
                   containsActive
